@@ -78,6 +78,7 @@ class ShootingState:
     brief: dict[str, Any]
     brief_sha256: str
     product_sha256: str
+    identities: list[dict[str, Any]] = field(default_factory=list)
     motifs: dict[str, MotifState] = field(default_factory=dict)
 
 
@@ -149,6 +150,7 @@ def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
                 brief=payload["brief"],
                 brief_sha256=payload["brief_sha256"],
                 product_sha256=payload["product_sha256"],
+                identities=payload.get("identities", []),
                 motifs={m["motif_id"]: MotifState(m["motif_id"]) for m in payload["brief"]["motifs"]},
             )
             continue

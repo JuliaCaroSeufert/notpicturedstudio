@@ -35,4 +35,8 @@ def test_manifest_describes_the_output():
 def test_mock_engine_is_marked_as_non_production():
     engine = MockEngine()
     assert engine.describe().production is False
-    assert engine.capabilities() == {Capability.TEXT2IMG}
+    assert engine.capabilities() == {
+        Capability.TEXT2IMG,
+        Capability.MULTI_REFERENCE,
+        Capability.LORA,
+    }

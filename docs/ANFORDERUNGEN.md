@@ -20,7 +20,8 @@ Antworten der Auftraggeberin auf die Prozessfragen. Ergänzt den Originalbrief i
 
 ## Personen im Bild
 
-- Wie ein Marken-Kind festgelegt wird (Kandidatenauswahl pro Kunde oder Katalog synthetischer Modelle), ist **offen**; Pro und Contra werden später abgewogen.
+- Marken-Kinder (entschieden am 11.11.2026): Mischform. Ein interner, nicht öffentlicher Vorrat geprüfter Kinder; der Kunde bekommt daraus eine Vorauswahl, das gewählte Kind wird exklusiv für die Marke gesperrt. Passt keines, wird neu erzeugt. Start mit Auswahl pro Kunde, weil ein Vorrat erst mit GPU entstehen kann.
+- Ein für eine Marke gesperrtes Kind soll mitwachsen: neue Versionen mit höherem Alter, abgeleitet aus der vorherigen.
 - Altersspanne insgesamt: etwa 3 Monate bis 17 Jahre. **v1: nur 2 bis 10 Jahre**; Säuglinge und 11 bis 17 Jahre in v2.
 - MVP: ein Kind pro Bild, keine Erwachsenen. Später sind Erwachsene und mehrere Personen notwendig.
 

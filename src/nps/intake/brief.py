@@ -34,6 +34,11 @@ _EXCLUDED_TERMS = re.compile(
 MIN_AGE_V1, MAX_AGE_V1 = 2, 10
 
 
+def screen_text(text: str) -> list[str]:
+    """Excluded terms found in a text, lower-cased and sorted."""
+    return sorted({match.group(0).lower() for match in _EXCLUDED_TERMS.finditer(text)})
+
+
 def screen_brief(brief: ShootingBrief) -> CheckResult:
     """Reject shootings in categories, contexts or age ranges that are excluded in v1."""
     reasons: list[str] = []
@@ -51,7 +56,7 @@ def screen_brief(brief: ShootingBrief) -> CheckResult:
     texts += [(f"persons[{i}].description", p.description) for i, p in enumerate(brief.persons)]
     texts += [(f"motif '{m.motif_id}'", m.description) for m in brief.motifs if m.description]
     for field, text in texts:
-        terms = sorted({match.group(0).lower() for match in _EXCLUDED_TERMS.finditer(text)})
+        terms = screen_text(text)
         if terms:
             reasons.append(f"{field} contains excluded terms: {', '.join(terms)}")
 

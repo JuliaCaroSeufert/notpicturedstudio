@@ -20,7 +20,13 @@ from PIL import Image
 
 from nps.core.hashing import sha256_image, sha256_json
 from nps.core.models import Manifest
-from nps.engine.base import Capability, EngineInfo, GenerationRequest, GenerationResult
+from nps.engine.base import (
+    Capability,
+    EngineInfo,
+    GenerationInputs,
+    GenerationRequest,
+    GenerationResult,
+)
 
 ENGINE_NAME = "flux2-klein-4b"
 
@@ -221,7 +227,13 @@ class Flux2KleinEngine:
         # they are listed here once the adapter implements and tests them.
         return {Capability.TEXT2IMG}
 
-    def generate(self, request: GenerationRequest) -> GenerationResult:
+    def generate(
+        self, request: GenerationRequest, inputs: GenerationInputs | None = None
+    ) -> GenerationResult:
+        if request.reference_sha256 or request.lora_sha256:
+            raise NotImplementedError(
+                "reference images and LoRA are not implemented in the FLUX.2 [klein] adapter yet"
+            )
         if request.width % 16 or request.height % 16:
             raise ValueError("FLUX.2 [klein] needs width and height divisible by 16")
         model = self._model()

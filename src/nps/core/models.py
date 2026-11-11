@@ -37,6 +37,15 @@ class PersonSpec(Frozen):
 
     age_years: int = Field(ge=0, le=17)
     description: str = Field(min_length=1)
+    # A registered brand child. Both are given together or not at all.
+    identity_id: str | None = None
+    identity_version: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _identity_is_complete(self) -> "PersonSpec":
+        if (self.identity_id is None) != (self.identity_version is None):
+            raise ValueError("identity_id and identity_version must be given together")
+        return self
 
 
 class Placement(Frozen):

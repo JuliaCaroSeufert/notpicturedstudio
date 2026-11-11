@@ -15,7 +15,14 @@ from PIL import Image
 
 from nps.core.hashing import sha256_image, sha256_json
 from nps.core.models import Manifest
-from nps.engine.base import Capability, EngineInfo, GenerationRequest, GenerationResult
+from nps.engine.base import (
+    Capability,
+    EngineInfo,
+    GenerationInputs,
+    GenerationRequest,
+    GenerationResult,
+    check_inputs,
+)
 
 MOCK_ENGINE_NAME = "mock"
 
@@ -27,10 +34,14 @@ class MockEngine:
         return EngineInfo(name=MOCK_ENGINE_NAME, version=self.VERSION, production=False)
 
     def capabilities(self) -> set[Capability]:
-        return {Capability.TEXT2IMG}
+        return {Capability.TEXT2IMG, Capability.MULTI_REFERENCE, Capability.LORA}
 
-    def generate(self, request: GenerationRequest) -> GenerationResult:
-        digest = hashlib.sha256(f"{request.seed}:{request.prompt}".encode("utf-8")).digest()
+    def generate(
+        self, request: GenerationRequest, inputs: GenerationInputs | None = None
+    ) -> GenerationResult:
+        check_inputs(request, inputs)
+        extras = "".join(f":{h}" for h in request.reference_sha256 + request.lora_sha256)
+        digest = hashlib.sha256(f"{request.seed}:{request.prompt}{extras}".encode("utf-8")).digest()
         rng = np.random.default_rng(int.from_bytes(digest[:8], "big"))
 
         # Integer arithmetic only, so the result is identical on every platform.

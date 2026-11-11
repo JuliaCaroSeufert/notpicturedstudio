@@ -1,6 +1,6 @@
 # notpicturedstudio
 
-System für vollsynthetische Werbebilder. Stand: **Schritte 0 bis 3** (Ablauf mit Test-Engine und C2PA-Signatur; FLUX-Adapter und Wasserzeichen vorbereitet, aber noch nicht mit den echten Modellen gelaufen).
+System für vollsynthetische Werbebilder. Stand: **Schritte 0 bis 4** (Ablauf mit Test-Engine und C2PA-Signatur; FLUX-Adapter und Wasserzeichen vorbereitet, aber noch nicht mit den echten Modellen gelaufen).
 
 Dokumente: [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/LIZENZPRUEFUNG.md`](docs/LIZENZPRUEFUNG.md), [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md), [`docs/ANFORDERUNGEN.md`](docs/ANFORDERUNGEN.md), [`docs/LIZENZPRUEFUNG_SCHRITT3.md`](docs/LIZENZPRUEFUNG_SCHRITT3.md).
 
@@ -70,6 +70,18 @@ Tests:
 
 Ergebnis in `out/`: `audit.jsonl` (Hash-Kette), `dossier-<kampagne>.json`, `assets/<kennung>/final.png`.
 
+## Ein Marken-Kind anlegen
+
+Braucht ein Zertifikat (siehe `nps dev-cert`). Alle Befehle unter `nps identity`; `--help` zeigt die Optionen.
+
+```bash
+.venv/bin/nps identity propose --out out --safety-gate mock_only --description "braune Locken" --age 4 --count 4 --by "Anna"
+```
+
+Danach der Reihe nach: `endorse` (zweimal, von zwei Personen), `extend`, `approve`, `train --trainer mock`, `freeze`, dann `pool` oder `assign --brand "Marke"`. Später `grow --age 6` für eine ältere Version. `list` zeigt den Stand.
+
+Im Briefing wird das Kind über `identity_id` und `identity_version` bei der Person angegeben. Das Shooting startet nur, wenn das Kind genau dieser Marke gehört, die Version eingefroren ist und das Alter passt.
+
 ## Erkennungsmodelle installieren
 
 Upload-Gate und Safety-Gate brauchen vier Modelle (zusammen rund 350 MB, laufen ohne GPU). Das Skript lädt genau die geprüften Stände und vergleicht ihre Prüfsummen:
@@ -119,5 +131,6 @@ Das Skript erzeugt zweimal dasselbe Stillleben ohne Menschen und prüft, ob beid
 | Korrekturen | bisher nur durch Auswahl einer anderen oder neu erzeugten Variante; gezielte Änderung eines Bildbereichs folgt |
 | Kennzeichnung | Sichtbares Label links unten, dann unsichtbares Wasserzeichen, zuletzt C2PA-Signatur. Die Signatur läuft mit Testzertifikat; das Wasserzeichen (TrustMark) ist angebunden, aber hier noch nie mit dem echten Modell gelaufen. Fehlt etwas davon, steht es im Dossier |
 | Audit | Hash-Kette als Datei; Postgres und qualifizierte Zeitstempel folgen später |
+| Marken-Kinder | Register mit festem Ablauf: Kandidaten aus Text → Zustimmung zweier Personen → Trainingsbilder mit dem Kandidaten als Referenz → Freigabe des Trainingssatzes → Training → Einfrieren. Danach interner Vorrat oder exklusive Sperre für genau eine Marke. „Mitwachsen“ über neue Versionen mit höherem Alter. Jedes Bild eines Kindes ist selbst erzeugt, vom Safety-Gate geprüft und signiert; hochladen lässt sich nichts. Das Training selbst ist noch ein Platzhalter (braucht GPU) |
 | Konfiguration | Zertifikat, Schlüssel und Wasserzeichen nur über Umgebungsvariablen (`NPS_C2PA_CERT`, `NPS_C2PA_KEY`, `NPS_C2PA_TSA_URL`, `NPS_WATERMARK=trustmark`); nichts davon liegt im Repository |
 | Dossier | JSON, ausschließlich aus der Audit-Kette erzeugt |

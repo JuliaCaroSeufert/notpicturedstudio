@@ -149,3 +149,18 @@ Entschieden am 11.11.2026: v1 deckt nur 2 bis 10 Jahre ab und nur Produkte, die 
 Ein unsichtbares Wasserzeichen verändert alle Pixel geringfügig, also auch die des Produkts. Damit die Regel „Produkt wird nie verändert" exakt gilt, werden die Produktpixel nach dem Einbetten zurückkopiert; danach wird das Wasserzeichen ausgelesen, und wenn es nicht mehr lesbar ist, wird nicht versiegelt. Ob TrustMark das bei großen Produkten im Bild zuverlässig übersteht, zeigt erst der Lauf mit dem echten Modell. Falls nicht, bleibt als Ausweg eine dokumentierte, unsichtbar kleine Toleranz im Produktbereich; das wäre eine Entscheidung der Auftraggeberin.
 
 Die Signatur enthält Kennung, Kampagne, Engine, Modellstand und den Hinweis „KI-generiert", aber keinen Prompt. Ohne Zeitstempel-Dienst (`NPS_C2PA_TSA_URL`) trägt die Signatur keine belegte Zeit; für Auslieferungen wird einer gebraucht, zusammen mit dem anerkannten Zertifikat.
+
+### Register der Marken-Kinder (Schritt 4)
+
+Umgesetzt in `src/nps/identity/register.py`; der Zustand wird wie bei Kampagnen allein aus der Audit-Kette gelesen.
+
+- Zustände eines Kindes: Kandidat → ausgewählt (zwei verschiedene Personen) → Vorrat oder exklusiv für eine Marke → stillgelegt. Die Zuordnung zu einer Marke ist endgültig.
+- Versionen: Jede Version hat ein Alter, einen freigegebenen Trainingssatz und eigene Gewichte. Eine eingefrorene Version ändert sich nie; „Mitwachsen" erzeugt eine neue Version, deren Trainingsbilder mit den Bildern der Vorgängerversion als Referenz entstehen. Ältere Versionen bleiben nutzbar.
+- Ein Kind gehört zu genau einer Engine.
+- Bilder eines Kindes entstehen nur im System, laufen durch das Safety-Gate und werden signiert. Vor Freigabe des Trainingssatzes und vor dem Training wird jede Datei gegen Prüfsumme und Signatur geprüft; eine fremde oder veränderte Datei stoppt den Vorgang.
+
+Noch offen:
+- Das Training ist ein Platzhalter (`MockTrainer`); der echte Trainer braucht eine GPU.
+- Der FLUX-Adapter kann noch keine Referenzbilder und keine LoRAs; das Register lehnt diese Schritte mit FLUX deshalb derzeit ab. Beides wird mit dem ersten GPU-Lauf ergänzt.
+- Das Ähnlichkeits-Screening der Kandidaten (Schritt 6) fehlt noch; bis dahin gibt es nur die Vier-Augen-Auswahl.
+- Ob ein Kind über Versionen hinweg wiedererkennbar bleibt, lässt sich erst mit dem echten Modell messen.

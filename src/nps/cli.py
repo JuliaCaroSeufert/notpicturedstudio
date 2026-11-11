@@ -15,6 +15,7 @@ from nps.core.hashing import sha256_bytes
 from nps.core.models import AssetState, ShootingBrief
 from nps.dossier.build import build_dossier
 from nps.engine.registry import ENGINE_NAMES, engine_by_name
+from nps.identity.register import IdentityRegister, MockTrainer, RegisterError
 from nps.intake.upload import UPLOAD_GATE_NAMES, DetectorUploadGate, upload_gate_by_name
 from nps.pipeline import AssetRecord, Pipeline, PipelineError
 from nps.provenance.c2pa_sign import C2paConfig, C2paSigner, ProvenanceError, read_credentials
@@ -58,7 +59,25 @@ def _pipeline(args: argparse.Namespace) -> Pipeline:
     engine = engine_by_name(getattr(args, "engine", "mock"))
     gate = gate_by_name(getattr(args, "safety_gate", BlockAllGate.name))
     upload_gate = upload_gate_by_name(getattr(args, "upload_gate", DetectorUploadGate.name))
-    return Pipeline(Path(args.out), engine, gate, sealer=sealer_from_env(), upload_gate=upload_gate)
+    out = Path(args.out)
+    log = AuditLog(out / "audit.jsonl")
+    register = _register(args, log)
+    return Pipeline(
+        out, engine, gate, log=log, sealer=sealer_from_env(), upload_gate=upload_gate, register=register
+    )
+
+
+def _register(args: argparse.Namespace, log: AuditLog | None = None) -> IdentityRegister:
+    config = C2paConfig.from_env()
+    trainer = MockTrainer() if getattr(args, "trainer", None) == "mock" else None
+    return IdentityRegister(
+        Path(args.out),
+        engine_by_name(getattr(args, "engine", "mock")),
+        gate_by_name(getattr(args, "safety_gate", BlockAllGate.name)),
+        C2paSigner(config) if config else None,
+        log=log,
+        trainer=trainer,
+    )
 
 
 def sealer_from_env() -> Sealer:
@@ -201,6 +220,55 @@ def cmd_customer(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_identity(args: argparse.Namespace) -> int:
+    register = _register(args)
+    action = args.action
+    if action == "list":
+        for identity in register.all().values():
+            brand = f", Marke {identity.brand}" if identity.brand else ""
+            print(f"{identity.identity_id}  {identity.status.value}{brand}  ({identity.engine}) {identity.description}")
+            for version in identity.versions.values():
+                images = sum(1 for image in version.images if image.role == "dataset")
+                print(
+                    f"    Version {version.number}: {version.age_years} Jahre, "
+                    f"{version.stage.value}, {images} Trainingsbilder"
+                )
+        return 0
+    if action == "propose":
+        for identity_id in register.propose(args.description, args.age, args.count, args.by):
+            images = register.get(identity_id).versions[1].images
+            where = register.image_path(identity_id, images[0].sha256) if images else "vom Safety-Gate blockiert"
+            print(f"{identity_id}: {where}")
+    elif action == "endorse":
+        status = register.endorse(args.id, args.by)
+        print("Ausgewählt." if status.value == "selected" else "Erste Zustimmung festgehalten; eine zweite Person muss zustimmen.")
+    elif action == "reject":
+        register.reject(args.id, args.by, args.note)
+        print("Kandidat abgelehnt.")
+    elif action == "extend":
+        created = register.extend_dataset(args.id, args.count)
+        print(f"{len(created)} von {args.count} Bildern erzeugt (der Rest wurde vom Safety-Gate blockiert).")
+    elif action == "approve":
+        chosen = register.approve_dataset(args.id, args.by, tuple(args.exclude))
+        print(f"Trainingssatz mit {len(chosen)} Bildern freigegeben.")
+    elif action == "train":
+        print(f"Trainiert. Gewichte: {register.train(args.id, args.by)}")
+    elif action == "freeze":
+        print(f"Version {register.freeze(args.id, args.by)} eingefroren.")
+    elif action == "pool":
+        register.add_to_pool(args.id, args.by)
+        print("In den Vorrat aufgenommen.")
+    elif action == "assign":
+        register.assign(args.id, args.brand, args.by)
+        print(f"Exklusiv für {args.brand} gesperrt.")
+    elif action == "grow":
+        print(f"Version {register.grow(args.id, args.age, args.by)} begonnen ({args.age} Jahre).")
+    elif action == "retire":
+        register.retire(args.id, args.by, args.note)
+        print("Stillgelegt.")
+    return 0
+
+
 def cmd_dev_cert(args: argparse.Namespace) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -321,6 +389,37 @@ def main(argv: list[str] | None = None) -> int:
     customer.add_argument("--comment", default="", help="Anmerkung zur Abnahme")
 
     command("verify", cmd_verify, "Audit-Kette prüfen")
+
+    identity = commands.add_parser("identity", help="Register der Marken-Kinder")
+    actions = identity.add_subparsers(dest="action", required=True)
+
+    def identity_action(name: str, help_text: str, *, on_id: bool = True, by: bool = True):
+        sub = actions.add_parser(name, help=help_text)
+        sub.add_argument("--out", required=True, help="Arbeitsverzeichnis")
+        sub.add_argument("--engine", default="mock", choices=ENGINE_NAMES)
+        sub.add_argument("--safety-gate", default=BlockAllGate.name, choices=GATE_NAMES)
+        if on_id:
+            sub.add_argument("--id", required=True, help="Kennung des Kindes")
+        if by:
+            sub.add_argument("--by", required=True, help="Name der handelnden Person")
+        sub.set_defaults(handler=cmd_identity)
+        return sub
+
+    identity_action("list", "alle Kinder anzeigen", on_id=False, by=False)
+    propose = identity_action("propose", "Kandidaten aus einer Beschreibung erzeugen", on_id=False)
+    propose.add_argument("--description", required=True)
+    propose.add_argument("--age", required=True, type=int)
+    propose.add_argument("--count", type=int, default=4)
+    identity_action("endorse", "einem Kandidaten zustimmen (zwei Personen nötig)")
+    identity_action("reject", "Kandidaten ablehnen").add_argument("--note", default="")
+    identity_action("extend", "Trainingsbilder erzeugen", by=False).add_argument("--count", type=int, default=12)
+    identity_action("approve", "Trainingssatz freigeben").add_argument("--exclude", nargs="*", default=[])
+    identity_action("train", "LoRA trainieren").add_argument("--trainer", default=None, choices=("mock",))
+    identity_action("freeze", "Version einfrieren")
+    identity_action("pool", "in den internen Vorrat aufnehmen")
+    identity_action("assign", "exklusiv für eine Marke sperren").add_argument("--brand", required=True)
+    identity_action("grow", "neue Version mit höherem Alter beginnen").add_argument("--age", required=True, type=int)
+    identity_action("retire", "stilllegen").add_argument("--note", default="")
     command("dev-cert", cmd_dev_cert, "Testzertifikat für die C2PA-Signatur erzeugen")
     inspect = command("inspect", cmd_inspect, "Signatur einer Bilddatei prüfen und mit der Audit-Kette abgleichen")
     inspect.add_argument("file")
@@ -329,7 +428,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.handler(args)
-    except PipelineError as error:
+    except (PipelineError, RegisterError) as error:
         print(f"Fehler: {error}", file=sys.stderr)
         return 1
     except ProvenanceError as error:

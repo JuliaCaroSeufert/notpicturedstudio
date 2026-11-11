@@ -19,7 +19,8 @@ from nps.core.models import (
     ShootingBrief,
     VersionStatus,
 )
-from nps.engine.base import Engine, GenerationRequest
+from nps.engine.base import Capability, Engine, GenerationInputs, GenerationRequest
+from nps.identity.register import IdentityRegister, RegisterError
 from nps.intake.brief import screen_brief
 from nps.intake.upload import (
     RejectAllUploadGate,
@@ -85,12 +86,14 @@ class Pipeline:
         log: AuditLog | None = None,
         sealer: Sealer | None = None,
         upload_gate: UploadGate | None = None,
+        register: IdentityRegister | None = None,
     ):
         self._out = Path(out_dir)
         self._engine = engine
         self._gate = gate
         self._sealer = sealer or Sealer()
         self._upload_gate = upload_gate or RejectAllUploadGate()
+        self._register = register
         self.log = log or AuditLog(self._out / "audit.jsonl")
 
     # -- storage ---------------------------------------------------------
@@ -250,6 +253,18 @@ class Pipeline:
                     },
                 )
                 return [AssetRecord(None, AssetState.REJECTED, (screening,))]
+            identities, identity_check = self._resolve_identities(brief)
+            if not identity_check.passed:
+                self.log.append(
+                    campaign_id=campaign,
+                    event="brief_rejected",
+                    payload={
+                        "shooting_id": brief.shooting_id,
+                        "brief": brief_data,
+                        "check": identity_check.model_dump(),
+                    },
+                )
+                return [AssetRecord(None, AssetState.REJECTED, (identity_check,))]
             admitted = self._product_admitted(campaign, product, product_sha)
             if not admitted.passed:
                 # Nothing is registered or generated; the upload record says why.
@@ -265,6 +280,7 @@ class Pipeline:
                     "brief": brief_data,
                     "brief_sha256": brief_sha,
                     "product_sha256": product_sha,
+                    "identities": identities,
                     "check": screening.model_dump(),
                 },
             )
@@ -278,10 +294,11 @@ class Pipeline:
                     "brief or product; use a new shooting id"
                 )
             start = len(shooting.motifs[motif_id].variants)
+            identities = shooting.identities
 
         total = count if count is not None else brief.variants_per_motif
         return [
-            self._generate_one(brief, product, product_sha, motif, index)
+            self._generate_one(brief, product, product_sha, motif, index, identities)
             for index in range(start, start + total)
         ]
 
@@ -292,6 +309,7 @@ class Pipeline:
         product_sha: str,
         motif: MotifSpec,
         index: int,
+        identities: list[dict[str, Any]],
     ) -> AssetRecord:
         seed = variant_seed(brief.base_seed, motif.motif_id, index)
         asset_id = sha256_json(
@@ -324,10 +342,16 @@ class Pipeline:
         )
 
         info = self._engine.describe()
+        lora_paths = self._lora_paths(identities)
         result = self._engine.generate(
             GenerationRequest(
-                prompt=build_prompt(brief, motif), seed=seed, width=brief.width, height=brief.height
-            )
+                prompt=build_prompt(brief, motif),
+                seed=seed,
+                width=brief.width,
+                height=brief.height,
+                lora_sha256=tuple(identity["lora_sha256"] for identity in identities),
+            ),
+            GenerationInputs(lora_paths=lora_paths),
         )
         record(
             "asset_generated",
@@ -379,6 +403,48 @@ class Pipeline:
             },
         )
         return done(AssetState.IN_REVIEW, checks, asset_dir / "composed.png")
+
+    def _resolve_identities(self, brief: ShootingBrief) -> tuple[list[dict[str, Any]], CheckResult]:
+        """Every registered child named in the brief must be usable by this brand."""
+        resolved: list[dict[str, Any]] = []
+        reasons: list[str] = []
+        engine = self._engine.describe().name
+        for person in brief.persons:
+            if person.identity_id is None:
+                continue
+            if self._register is None:
+                reasons.append("the brief names a registered child, but no register is configured")
+                continue
+            ok, reason, reference = self._register.resolve_for_shooting(
+                person.identity_id,
+                person.identity_version,
+                brand=brief.brand.name,
+                age_years=person.age_years,
+                engine=engine,
+            )
+            if ok:
+                resolved.append(reference)
+            else:
+                reasons.append(reason)
+        if resolved and Capability.LORA not in self._engine.capabilities():
+            reasons.append(f"engine '{engine}' cannot apply a LoRA in this adapter")
+        return resolved, CheckResult(check="identity", passed=not reasons, details={"reasons": reasons})
+
+    def _lora_paths(self, identities: list[dict[str, Any]]) -> tuple[Path, ...]:
+        if not identities:
+            return ()
+        if self._register is None:
+            raise PipelineError("this shooting uses a registered child, but no register is configured")
+        paths = []
+        for identity in identities:
+            try:
+                path, recorded = self._register.verified_lora(identity["identity_id"], identity["version"])
+            except RegisterError as error:
+                raise PipelineError(str(error)) from error
+            if recorded != identity["lora_sha256"]:
+                raise PipelineError(f"LoRA of '{identity['identity_id']}' differs from the registered shooting")
+            paths.append(path)
+        return tuple(paths)
 
     # -- internal review -------------------------------------------------
 

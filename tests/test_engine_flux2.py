@@ -8,37 +8,14 @@ from nps.engine.flux2_klein import (
     Flux2KleinConfig,
     Flux2KleinEngine,
     Flux2Variant,
-    LoadedModel,
     hash_model_dir,
 )
 from nps.engine.base import GenerationRequest
 from nps.engine.registry import engine_by_name
 from nps.pipeline import Pipeline
 from nps.safety.gate import BlockAllGate, MockOnlyGate
+from tests.engine_fakes import FakeBackend
 from tests.fakes import open_upload_gate
-
-
-class FakeBackend:
-    """Stands in for the model: returns a colour derived from the seed."""
-
-    def __init__(self, size=None):
-        self.loads = 0
-        self.calls = []
-        self._size = size
-
-    def load(self, config):
-        self.loads += 1
-        return LoadedModel(
-            weights_sha256="w" * 64,
-            libraries={"torch": "2.6.0", "diffusers": "0.42.1"},
-            runtime={"device": config.device, "gpu": "Fake L40S"},
-        )
-
-    def run(self, **kwargs):
-        self.calls.append(kwargs)
-        size = self._size or (kwargs["width"], kwargs["height"])
-        seed = kwargs["seed"]
-        return Image.new("RGBA", size, (seed % 256, (seed >> 8) % 256, 7, 255))
 
 
 def request(**overrides):
@@ -162,3 +139,11 @@ def test_no_placeholder_gate_lets_real_model_output_through(tmp_path, brief, pro
     records = pipe.generate_variants(brief, product, "m1", count=1)
     assert records[0].state.value == "blocked"
     assert not (tmp_path / "assets").exists()
+
+
+def test_references_and_lora_are_refused_until_implemented():
+    engine = Flux2KleinEngine(backend=FakeBackend())
+    with pytest.raises(NotImplementedError):
+        engine.generate(request(lora_sha256=("abc",)))
+    with pytest.raises(NotImplementedError):
+        engine.generate(request(reference_sha256=("abc",)))
