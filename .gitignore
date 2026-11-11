@@ -6,3 +6,4 @@ out/
 .env
 certs/
 *.pem
+models/

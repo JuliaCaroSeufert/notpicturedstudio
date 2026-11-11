@@ -56,6 +56,23 @@ class MotifState:
 
 
 @dataclass
+class UploadState:
+    sha256: str
+    filename: str
+    purpose: str
+    decision: str  # accepted, needs_review or rejected; final after a review
+    reasons: list[str]
+    details: dict[str, Any]
+    gate: str
+    uploaded_by: str
+    review: dict[str, Any] | None = None
+
+    @property
+    def usable(self) -> bool:
+        return self.decision == "accepted"
+
+
+@dataclass
 class ShootingState:
     shooting_id: str
     brief: dict[str, Any]
@@ -70,6 +87,7 @@ class CampaignState:
     shootings: dict[str, ShootingState] = field(default_factory=dict)
     assets: dict[str, VariantState] = field(default_factory=dict)
     rejected_briefs: list[dict[str, Any]] = field(default_factory=list)
+    uploads: dict[str, UploadState] = field(default_factory=dict)
     notices: set[str] = field(default_factory=set)
     entries: int = 0
     head_hash: str | None = None
@@ -81,6 +99,10 @@ class CampaignState:
 
 NOTICE_TEST_ENGINE = "Bild stammt aus einer Test-Engine, nicht aus einem Produktionsmodell."
 NOTICE_PLACEHOLDER_GATE = "Safety-Gate ist ein Platzhalter, kein Klassifikator."
+NOTICE_PROVISIONAL_GATE = (
+    "Safety-Gate ist ein Provisorium aus allgemeinen Nacktheits-Klassifikatoren; "
+    "ein Kinderschutz-Klassifikator (Thorn) ist noch nicht angebunden."
+)
 NOTICE_NO_C2PA = "Mindestens ein Bild ohne C2PA-Signatur."
 NOTICE_UNTRUSTED_C2PA = "C2PA-Signatur mit nicht anerkanntem Zertifikat (Testzertifikat)."
 NOTICE_NO_WATERMARK = "Mindestens ein Bild ohne unsichtbares Wasserzeichen."
@@ -98,6 +120,28 @@ def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
 
         if entry.event == "brief_rejected":
             state.rejected_briefs.append({"timestamp": entry.timestamp, **payload})
+            continue
+        if entry.event == "upload_checked":
+            state.uploads[payload["sha256"]] = UploadState(
+                sha256=payload["sha256"],
+                filename=payload["filename"],
+                purpose=payload["purpose"],
+                decision=payload["decision"],
+                reasons=payload["reasons"],
+                details=payload["details"],
+                gate=payload["gate"],
+                uploaded_by=payload["uploaded_by"],
+            )
+            continue
+        if entry.event == "upload_reviewed":
+            upload = state.uploads[payload["sha256"]]
+            upload.decision = "accepted" if payload["accepted"] else "rejected"
+            upload.review = {
+                "reviewer": payload["reviewer"],
+                "accepted": payload["accepted"],
+                "note": payload["note"],
+                "timestamp": entry.timestamp,
+            }
             continue
         if entry.event == "shooting_registered":
             state.shootings[payload["shooting_id"]] = ShootingState(
@@ -141,7 +185,8 @@ def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
         if payload.get("engine_production") is False:
             state.notices.add(NOTICE_TEST_ENGINE)
         if payload.get("gate_production") is False:
-            state.notices.add(NOTICE_PLACEHOLDER_GATE)
+            provisional = payload["check"]["details"].get("gate") == "provisional"
+            state.notices.add(NOTICE_PROVISIONAL_GATE if provisional else NOTICE_PLACEHOLDER_GATE)
 
         motif = state.motif_of(entry.asset_id)
         if entry.event == "asset_sealed":

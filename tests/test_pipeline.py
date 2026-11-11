@@ -12,12 +12,13 @@ from nps.pipeline import AssetRecord, Pipeline, PipelineError, variant_seed
 from nps.product.composite import verify_product_pixels
 from nps.safety.gate import BlockAllGate, MockOnlyGate
 from tests.conftest import make_brief
+from tests.fakes import open_upload_gate
 
 C, S = "test-campaign", "shooting-a"
 
 
 def pipeline(tmp_path, gate=None):
-    return Pipeline(tmp_path, MockEngine(), gate or MockOnlyGate())
+    return Pipeline(tmp_path, MockEngine(), gate or MockOnlyGate(), upload_gate=open_upload_gate())
 
 
 def events(pipe, asset_id=None):
@@ -101,7 +102,7 @@ def test_excluded_brief_generates_nothing(tmp_path, product):
     pipe = pipeline(tmp_path)
     records = pipe.generate_shooting(make_brief(product_category="diapers"), product)
     assert [r.state for r in records] == [AssetState.REJECTED]
-    assert events(pipe) == ["brief_rejected"]
+    assert events(pipe) == ["brief_rejected"]  # rejected before the product is even looked at
     assert not list(tmp_path.rglob("*.png"))
 
 
@@ -251,12 +252,12 @@ def test_dossier_reflects_the_chain(tmp_path, brief, product):
 
 
 def test_cli_flow(tmp_path, capsys):
-    assert main(["run", "--demo", "--out", str(tmp_path / "blocked")]) == 2
+    assert main(["run", "--demo", "--out", str(tmp_path / "blocked"), "--upload-gate", "demo_only"]) == 2
     out = str(tmp_path / "ok")
     base = ["--out", out, "--campaign", "demo-herbst"]
     version = base + ["--shooting", "kinderzimmer", "--motif", "stapeln", "--version", "1", "--by", "R"]
 
-    assert main(["run", "--demo", "--out", out, "--safety-gate", "mock_only"]) == 0
+    assert main(["run", "--demo", "--out", out, "--safety-gate", "mock_only", "--upload-gate", "demo_only"]) == 0
     dossier_path = tmp_path / "ok" / "dossier-demo-herbst.json"
     asset = json.loads(dossier_path.read_text())["shootings"][0]["motifs"][0]["variants"][1]["asset_id"]
 

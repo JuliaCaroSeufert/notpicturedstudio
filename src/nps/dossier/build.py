@@ -47,5 +47,6 @@ def build_dossier(log: AuditLog, campaign_id: str) -> dict[str, Any]:
         },
         "notices": sorted(state.notices),
         "rejected_briefs": state.rejected_briefs,
+        "uploads": [asdict(upload) for upload in state.uploads.values()],
         "shootings": shootings,
     }

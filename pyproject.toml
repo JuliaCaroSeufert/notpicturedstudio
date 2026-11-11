@@ -16,6 +16,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "cryptography>=42"]
+# Upload gate and provisional safety gate. Licences: docs/LIZENZPRUEFUNG_SCHRITT3.md.
+detectors = [
+    "torch>=2.6",
+    "timm>=1.0",
+    "transformers>=4.49",
+    "safetensors>=0.8",
+    "opencv-python-headless>=4.10",
+]
 # Invisible watermark (TrustMark, MIT). Pulls in torch.
 watermark = ["trustmark>=0.9.2"]
 # Only needed where the real model runs. Licences: docs/LIZENZPRUEFUNG.md.

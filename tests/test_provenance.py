@@ -28,6 +28,7 @@ from nps.provenance.watermark import (
     watermarker_by_name,
 )
 from nps.safety.gate import MockOnlyGate
+from tests.fakes import open_upload_gate
 from nps.state import NOTICE_NO_C2PA, NOTICE_NO_WATERMARK, NOTICE_UNTRUSTED_C2PA
 
 C, S = "test-campaign", "shooting-a"
@@ -213,7 +214,9 @@ def test_failed_watermark_stops_sealing(product, signer):
 
 
 def run_pipeline(tmp_path, brief, product, sealer):
-    pipe = Pipeline(tmp_path, MockEngine(), MockOnlyGate(), sealer=sealer)
+    pipe = Pipeline(
+        tmp_path, MockEngine(), MockOnlyGate(), sealer=sealer, upload_gate=open_upload_gate()
+    )
     records = pipe.generate_variants(brief, product, "m1")
     return pipe, records
 
@@ -256,7 +259,7 @@ def test_cli_signs_and_inspects(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "certs" / "dev-key.pem").stat().st_mode & 0o077 == 0
 
     base = ["--out", out, "--campaign", "demo-herbst"]
-    assert main(["run", "--demo", "--out", out, "--safety-gate", "mock_only"]) == 0
+    assert main(["run", "--demo", "--out", out, "--safety-gate", "mock_only", "--upload-gate", "demo_only"]) == 0
     dossier = tmp_path / "work" / "dossier-demo-herbst.json"
     asset = json.loads(dossier.read_text())["shootings"][0]["motifs"][0]["variants"][0]["asset_id"]
     assert main(["approve", *base, "--asset", asset, "--by", "R"]) == 0

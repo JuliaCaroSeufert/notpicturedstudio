@@ -66,3 +66,18 @@ Hände sind laut Entscheidung der Auftraggeberin erlaubt. Ein Personenerkenner k
 **Laufzeit.** Alle vier Modelle laufen ohne GPU. Sie brauchen die Bibliothek torch (groß, aber frei lizenziert) und OpenCV (Apache 2.0).
 
 **Test in dieser Umgebung.** Die Gewichte liegen auf einem Hugging-Face-Downloadserver (`us.aws.cdn.hf.co`), der hier gesperrt ist. Ohne Freigabe dieses Hosts lassen sich die Gates nur gegen Ersatzmodelle testen, nicht mit den echten.
+
+## 5. Umsetzung und erste Messung (11.11.2026)
+
+Entscheidung der Auftraggeberin zum Upload-Gate, abweichend von Abschnitt 4: Ein kleiner Personenbereich ohne Gesicht (unter 15 % der Bildfläche) wird direkt angenommen; über einen größeren Personenbereich ohne Gesicht entscheidet ein Mensch. Gesichter werden immer abgelehnt.
+
+Alle vier Modelle sind mit Revision und Prüfsumme festgeschrieben (`src/nps/detectors.py`) und laufen ohne GPU.
+
+Gemessen mit harmlosen Bildern:
+
+- Freepik stuft Fotos, Grafiken und einfarbige Flächen sicher als neutral ein (0,98 bis 1,00).
+- Marqo liegt bei echten Fotos um 0,05, schwankt bei flächigen Grafiken aber zwischen 0,14 und 0,47. Mit der Schwelle 0,30 blockiert das Gate deshalb einen Teil der abstrakten Bilder der Test-Engine. Das ist die sichere Richtung, zeigt aber, dass Marqo außerhalb von Fotos unzuverlässig ist.
+- Wie beide Modelle auf tatsächlich problematische Inhalte reagieren, wurde **nicht** gemessen; dafür wurden hier bewusst keine entsprechenden Bilder beschafft. Die Schwellen (Freepik: neutral mindestens 0,90; Marqo: höchstens 0,30) sind vorsichtig gewählt, aber nicht kalibriert. Die Kalibrierung braucht echte erzeugte Bilder und gehört in die Regressionssuite.
+- Ein Gruppenfoto mit vielen Gesichtern wurde vom Upload-Gate abgelehnt, ein Produktbild und ein Foto ohne Menschen wurden angenommen. Rückenansichten, einzelne Hände und Kinderfotos wurden mangels Testmaterial nicht gemessen.
+
+Technischer Hinweis: Die Hugging-Face-Bibliothek lädt große Dateien inzwischen über einen weiteren Server (`cas-server.xethub.hf.co`). Das Download-Skript umgeht ihn und lädt direkt über `huggingface.co` und `us.aws.cdn.hf.co`.

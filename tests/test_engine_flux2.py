@@ -15,6 +15,7 @@ from nps.engine.base import GenerationRequest
 from nps.engine.registry import engine_by_name
 from nps.pipeline import Pipeline
 from nps.safety.gate import BlockAllGate, MockOnlyGate
+from tests.fakes import open_upload_gate
 
 
 class FakeBackend:
@@ -155,7 +156,9 @@ def test_model_dir_hash_depends_on_content_and_names(tmp_path):
 
 @pytest.mark.parametrize("gate", [BlockAllGate(), MockOnlyGate()])
 def test_no_placeholder_gate_lets_real_model_output_through(tmp_path, brief, product, gate):
-    pipe = Pipeline(tmp_path, Flux2KleinEngine(backend=FakeBackend()), gate)
+    pipe = Pipeline(
+        tmp_path, Flux2KleinEngine(backend=FakeBackend()), gate, upload_gate=open_upload_gate()
+    )
     records = pipe.generate_variants(brief, product, "m1", count=1)
     assert records[0].state.value == "blocked"
     assert not (tmp_path / "assets").exists()

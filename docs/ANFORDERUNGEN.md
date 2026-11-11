@@ -16,7 +16,7 @@ Antworten der Auftraggeberin auf die Prozessfragen. Ergänzt den Originalbrief i
 - Eingabe über ein Formular mit festen Feldern, dazu Bild- und Video-Input: Moodboards, Produktbilder, Referenzbilder.
 - Ein Briefing beschreibt ein Shooting mit mehreren Motiven **oder** ein einzelnes Bild. Einzelne Motive können beschrieben werden, müssen aber nicht.
 - Den Detailgrad der Szenenvorgabe wählt der Kunde frei.
-- Referenzbilder ohne Menschen sind erlaubt. Moodboards und Videos mit Menschen werden abgelehnt; Bilder, die nur das Produkt und keine Gesichter zeigen, sind in Ordnung. Fotos mit Händen, aber ohne Gesicht, sind erlaubt (Entscheidung vom 11.11.2026). Offen für den Anwalt: Eine Kinderhand ist ein Foto eines echten Kindes; ob das mit der Regel „keine echten Kinderfotos" vereinbar ist, sollte er bestätigen.
+- Referenzbilder ohne Menschen sind erlaubt. Moodboards und Videos mit Menschen werden abgelehnt; Bilder, die nur das Produkt und keine Gesichter zeigen, sind in Ordnung. Fotos mit Händen, aber ohne Gesicht, sind erlaubt (Entscheidung vom 11.11.2026). Regel im Upload-Gate: Gesicht → abgelehnt; kleiner Personenbereich ohne Gesicht → angenommen; größerer Personenbereich ohne Gesicht → ein Mensch entscheidet. Offen für den Anwalt: Eine Kinderhand ist ein Foto eines echten Kindes; ob das mit der Regel „keine echten Kinderfotos" vereinbar ist, sollte er bestätigen.
 
 ## Personen im Bild
 

@@ -1,6 +1,6 @@
 # notpicturedstudio
 
-System für vollsynthetische Werbebilder. Stand: **Schritte 0, 0b, 1 und 2** (Ablauf mit Test-Engine und C2PA-Signatur; FLUX-Adapter und Wasserzeichen vorbereitet, aber noch nicht mit den echten Modellen gelaufen).
+System für vollsynthetische Werbebilder. Stand: **Schritte 0 bis 3** (Ablauf mit Test-Engine und C2PA-Signatur; FLUX-Adapter und Wasserzeichen vorbereitet, aber noch nicht mit den echten Modellen gelaufen).
 
 Dokumente: [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/LIZENZPRUEFUNG.md`](docs/LIZENZPRUEFUNG.md), [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md), [`docs/ANFORDERUNGEN.md`](docs/ANFORDERUNGEN.md), [`docs/LIZENZPRUEFUNG_SCHRITT3.md`](docs/LIZENZPRUEFUNG_SCHRITT3.md).
 
@@ -19,7 +19,7 @@ python3 -m venv .venv
 Beispiel-Shooting mit zwei Motiven und je sechs Varianten erzeugen:
 
 ```bash
-.venv/bin/nps run --demo --out out --safety-gate mock_only
+.venv/bin/nps run --demo --out out --safety-gate mock_only --upload-gate demo_only
 ```
 
 Stand ansehen (zeigt die Kennung jeder Variante):
@@ -70,6 +70,26 @@ Tests:
 
 Ergebnis in `out/`: `audit.jsonl` (Hash-Kette), `dossier-<kampagne>.json`, `assets/<kennung>/final.png`.
 
+## Erkennungsmodelle installieren
+
+Upload-Gate und Safety-Gate brauchen vier Modelle (zusammen rund 350 MB, laufen ohne GPU). Das Skript lädt genau die geprüften Stände und vergleicht ihre Prüfsummen:
+
+```bash
+.venv/bin/pip install -e ".[detectors]"
+```
+
+```bash
+.venv/bin/python scripts/fetch_models.py
+```
+
+Ohne diese Modelle läuft die Demo mit `--upload-gate demo_only` (nimmt nur das eingebaute Beispielprodukt an).
+
+Eine Referenzdatei prüfen und aufnehmen:
+
+```bash
+.venv/bin/nps upload moodboard.png --out out --campaign demo-herbst --by "Dein Name"
+```
+
 ## Erster Lauf mit dem echten Modell (EU-GPU)
 
 Braucht eine GPU (laut Modellkarte etwa 13 GB Grafikspeicher) und Zugriff auf `huggingface.co` für den Download der Gewichte.
@@ -92,7 +112,8 @@ Das Skript erzeugt zweimal dasselbe Stillleben ohne Menschen und prüft, ob beid
 | Brief-Prüfung | Nur ein Kind von 2 bis 10 Jahren. Windel-, Bade-, Schwimm- und Unterwäsche-Kategorien sowie entsprechende Begriffe im Text werden abgelehnt |
 | Engines | Test-Engine (abstrakte Farbflächen, keine Menschen) und FLUX.2 [klein] 4B (nur Text-zu-Bild; auf einer GPU noch nicht gelaufen) |
 | Produkt-Treue | Produkt wird in Originalgröße eingesetzt; Pixelvergleich nach dem Einsetzen und nochmals am fertigen Bild |
-| Safety-Gate | Platzhalter. Standard `block_all` blockiert alles; `mock_only` lässt nur die Test-Engine durch |
+| Upload-Gate | Jede Referenz- oder Produktdatei wird auf Gesichter und Personen geprüft (YuNet, RT-DETR v2), Videos Bild für Bild. Gesicht: abgelehnt. Größerer Personenbereich ohne Gesicht: ein Mensch entscheidet. Kleiner Personenbereich (typisch eine Hand) oder nichts: angenommen. Abgelehnte Dateien werden nicht gespeichert |
+| Safety-Gate | `provisional`: zwei allgemeine Nacktheits-Klassifikatoren (Freepik, Marqo), blockiert, sobald einer anschlägt oder ausfällt. Kein Kinderschutz-Klassifikator; Schwellen noch nicht an echten erzeugten Bildern eingestellt. Standard bleibt `block_all` |
 | Interne Freigabe | mit Namen; macht eine Variante zur nächsten Fassung. Eine neue Fassung ist nur nach einem Änderungswunsch des Kunden möglich |
 | Kunde | sieht nur freigegebene Fassungen; Abnahme oder Änderungswunsch wird protokolliert |
 | Korrekturen | bisher nur durch Auswahl einer anderen oder neu erzeugten Variante; gezielte Änderung eines Bildbereichs folgt |

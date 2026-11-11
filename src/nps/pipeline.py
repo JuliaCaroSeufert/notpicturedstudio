@@ -21,6 +21,13 @@ from nps.core.models import (
 )
 from nps.engine.base import Engine, GenerationRequest
 from nps.intake.brief import screen_brief
+from nps.intake.upload import (
+    RejectAllUploadGate,
+    UploadDecision,
+    UploadGate,
+    UploadVerdict,
+    check_image_via_file,
+)
 from nps.product.composite import composite_product, verify_product_pixels
 from nps.provenance.seal import Sealer
 from nps.safety.gate import SafetyGate
@@ -77,11 +84,13 @@ class Pipeline:
         gate: SafetyGate,
         log: AuditLog | None = None,
         sealer: Sealer | None = None,
+        upload_gate: UploadGate | None = None,
     ):
         self._out = Path(out_dir)
         self._engine = engine
         self._gate = gate
         self._sealer = sealer or Sealer()
+        self._upload_gate = upload_gate or RejectAllUploadGate()
         self.log = log or AuditLog(self._out / "audit.jsonl")
 
     # -- storage ---------------------------------------------------------
@@ -101,6 +110,110 @@ class Pipeline:
 
     def state(self, campaign_id: str) -> CampaignState:
         return read_campaign(self.log, campaign_id)
+
+    # -- uploads ---------------------------------------------------------
+
+    def _upload_path(self, sha256: str, pending: bool) -> Path:
+        return self._out / "uploads" / ("pending" if pending else "accepted") / sha256
+
+    def _record_upload(
+        self,
+        campaign_id: str,
+        *,
+        sha256: str,
+        filename: str,
+        purpose: str,
+        uploaded_by: str,
+        verdict: UploadVerdict,
+        data: bytes | None,
+    ) -> None:
+        # Rejected files are not kept. Files waiting for a decision are kept apart.
+        if data is not None and verdict.decision is not UploadDecision.REJECTED:
+            target = self._upload_path(sha256, verdict.decision is UploadDecision.NEEDS_REVIEW)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        self.log.append(
+            campaign_id=campaign_id,
+            event="upload_checked",
+            payload={
+                "sha256": sha256,
+                "filename": filename,
+                "purpose": purpose,
+                "uploaded_by": uploaded_by,
+                "gate": self._upload_gate.name,
+                "decision": verdict.decision.value,
+                "reasons": list(verdict.reasons),
+                "details": verdict.details,
+            },
+        )
+
+    def register_upload(
+        self, campaign_id: str, path: Path, *, purpose: str, uploaded_by: str
+    ) -> tuple[str, UploadVerdict]:
+        """Check a reference or product file. Returns its hash and the verdict."""
+        _require_name(uploaded_by, "uploaded_by")
+        path = Path(path)
+        data = path.read_bytes()
+        sha256 = sha256_bytes(data)
+        known = self.state(campaign_id).uploads.get(sha256)
+        if known is not None:
+            return sha256, UploadVerdict(UploadDecision(known.decision), tuple(known.reasons), known.details)
+        verdict = self._upload_gate.check_file(path)
+        self._record_upload(
+            campaign_id,
+            sha256=sha256,
+            filename=path.name,
+            purpose=purpose,
+            uploaded_by=uploaded_by,
+            verdict=verdict,
+            data=data,
+        )
+        return sha256, verdict
+
+    def review_upload(
+        self, campaign_id: str, sha256: str, reviewer: str, *, accept: bool, note: str = ""
+    ) -> None:
+        """A human decides on an upload the gate could not decide."""
+        _require_name(reviewer, "reviewer")
+        upload = self.state(campaign_id).uploads.get(sha256)
+        if upload is None or upload.decision != UploadDecision.NEEDS_REVIEW.value:
+            raise PipelineError(f"upload {sha256[:12]} is not waiting for a decision")
+        pending = self._upload_path(sha256, pending=True)
+        if pending.exists():
+            if accept:
+                target = self._upload_path(sha256, pending=False)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                pending.replace(target)
+            else:
+                pending.unlink()
+        self.log.append(
+            campaign_id=campaign_id,
+            event="upload_reviewed",
+            payload={"sha256": sha256, "reviewer": reviewer, "accepted": accept, "note": note},
+        )
+
+    def _product_admitted(self, campaign_id: str, product: Image.Image, product_sha: str) -> CheckResult:
+        """The product image must have passed the upload gate, like any other upload."""
+        upload = self.state(campaign_id).uploads.get(product_sha)
+        if upload is None:
+            verdict = check_image_via_file(self._upload_gate, product)
+            self._record_upload(
+                campaign_id,
+                sha256=product_sha,
+                filename="product",
+                purpose="product",
+                uploaded_by="pipeline",
+                verdict=verdict,
+                data=None,
+            )
+            decision, reasons = verdict.decision.value, list(verdict.reasons)
+        else:
+            decision, reasons = upload.decision, upload.reasons
+        return CheckResult(
+            check="product_upload",
+            passed=decision == UploadDecision.ACCEPTED.value,
+            details={"decision": decision, "reasons": reasons, "sha256": product_sha},
+        )
 
     # -- generation ------------------------------------------------------
 
@@ -137,6 +250,10 @@ class Pipeline:
                     },
                 )
                 return [AssetRecord(None, AssetState.REJECTED, (screening,))]
+            admitted = self._product_admitted(campaign, product, product_sha)
+            if not admitted.passed:
+                # Nothing is registered or generated; the upload record says why.
+                return [AssetRecord(None, AssetState.REJECTED, (admitted,))]
             path = self._product_path(product_sha)
             path.parent.mkdir(parents=True, exist_ok=True)
             product.save(path)

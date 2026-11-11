@@ -1,6 +1,6 @@
 """Safety gate interface and the two step-0 implementations.
 
-Neither is a real classifier. `BlockAllGate` is the default, so a deployment
+Neither is a real classifier (the provisional gate lives in provisional.py). `BlockAllGate` is the default, so a deployment
 that forgot to configure a gate delivers nothing. `MockOnlyGate` exists for the
 end-to-end run with the mock engine and refuses output from any other engine.
 """
@@ -50,11 +50,16 @@ class MockOnlyGate:
         )
 
 
-_GATES: dict[str, type] = {BlockAllGate.name: BlockAllGate, MockOnlyGate.name: MockOnlyGate}
+GATE_NAMES = (BlockAllGate.name, MockOnlyGate.name, "provisional")
 
 
 def gate_by_name(name: str) -> SafetyGate:
-    try:
-        return _GATES[name]()
-    except KeyError:
-        raise ValueError(f"unknown safety gate '{name}', expected one of {sorted(_GATES)}") from None
+    if name == BlockAllGate.name:
+        return BlockAllGate()
+    if name == MockOnlyGate.name:
+        return MockOnlyGate()
+    if name == "provisional":
+        from nps.safety.provisional import ProvisionalGate
+
+        return ProvisionalGate()
+    raise ValueError(f"unknown safety gate '{name}', expected one of {list(GATE_NAMES)}")

@@ -15,12 +15,13 @@ from nps.core.hashing import sha256_bytes
 from nps.core.models import AssetState, ShootingBrief
 from nps.dossier.build import build_dossier
 from nps.engine.registry import ENGINE_NAMES, engine_by_name
+from nps.intake.upload import UPLOAD_GATE_NAMES, DetectorUploadGate, upload_gate_by_name
 from nps.pipeline import AssetRecord, Pipeline, PipelineError
 from nps.provenance.c2pa_sign import C2paConfig, C2paSigner, ProvenanceError, read_credentials
 from nps.provenance.devcert import generate_dev_chain
 from nps.provenance.seal import Sealer
 from nps.provenance.watermark import watermarker_by_name
-from nps.safety.gate import BlockAllGate, gate_by_name
+from nps.safety.gate import GATE_NAMES, BlockAllGate, gate_by_name
 from nps.state import read_campaign
 
 DEMO_BRIEF = {
@@ -56,7 +57,8 @@ def _pipeline(args: argparse.Namespace) -> Pipeline:
     # Review and client steps never generate, so they get the engine-free defaults.
     engine = engine_by_name(getattr(args, "engine", "mock"))
     gate = gate_by_name(getattr(args, "safety_gate", BlockAllGate.name))
-    return Pipeline(Path(args.out), engine, gate, sealer=sealer_from_env())
+    upload_gate = upload_gate_by_name(getattr(args, "upload_gate", DetectorUploadGate.name))
+    return Pipeline(Path(args.out), engine, gate, sealer=sealer_from_env(), upload_gate=upload_gate)
 
 
 def sealer_from_env() -> Sealer:
@@ -86,6 +88,9 @@ def _print_status(out: Path, campaign_id: str) -> None:
                 print(f"    Variante {variant.index + 1}: {variant.asset_id}  {variant.state.value}")
             for version in motif.versions:
                 print(f"    Fassung V{version.number}: {version.asset_id}  {version.status.value}")
+    for upload in state.uploads.values():
+        reasons = f"  ({'; '.join(upload.reasons)})" if upload.reasons else ""
+        print(f"Upload {upload.filename} [{upload.purpose}] {upload.sha256[:12]}: {upload.decision}{reasons}")
     for rejected in state.rejected_briefs:
         reasons = "; ".join(rejected["check"]["details"]["reasons"])
         print(f"Abgelehntes Briefing {rejected['shooting_id']}: {reasons}")
@@ -115,6 +120,37 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"Nicht bestanden: {failed[0]} {failed[1]}")
     print(f"Dossier: {dossier}")
     return 0 if any(record.state is AssetState.IN_REVIEW for record in records) else 2
+
+
+def cmd_upload(args: argparse.Namespace) -> int:
+    pipeline = _pipeline(args)
+    sha256, verdict = pipeline.register_upload(
+        args.campaign, Path(args.file), purpose=args.purpose, uploaded_by=args.by
+    )
+    _write_dossier(Path(args.out), pipeline.log, args.campaign)
+    print(f"Upload {sha256[:12]}: {verdict.decision.value}")
+    for reason in verdict.reasons:
+        print(f"  {reason}")
+    if verdict.decision.value == "needs_review":
+        print(f"  Entscheidung nötig: nps upload-review --sha {sha256} --accept oder --reject")
+    return 0 if verdict.decision.value == "accepted" else 2
+
+
+def cmd_upload_review(args: argparse.Namespace) -> int:
+    pipeline = _pipeline(args)
+    sha256 = _full_upload_hash(Path(args.out), args.campaign, args.sha)
+    pipeline.review_upload(args.campaign, sha256, args.by, accept=args.accept, note=args.note)
+    _write_dossier(Path(args.out), pipeline.log, args.campaign)
+    print("Upload angenommen." if args.accept else "Upload abgelehnt und gelöscht.")
+    return 0
+
+
+def _full_upload_hash(out: Path, campaign_id: str, prefix: str) -> str:
+    uploads = read_campaign(AuditLog(out / "audit.jsonl"), campaign_id).uploads
+    matches = [sha for sha in uploads if sha.startswith(prefix)]
+    if len(matches) != 1:
+        raise PipelineError(f"'{prefix}' passt auf {len(matches)} Uploads; bitte eindeutig angeben")
+    return matches[0]
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -243,8 +279,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument(
         "--safety-gate",
         default=BlockAllGate.name,
-        help="block_all (Standard, blockiert alles) oder mock_only (nur Test-Engine)",
+        choices=GATE_NAMES,
+        help="block_all (Standard, blockiert alles), mock_only (nur Test-Engine) "
+        "oder provisional (Nacktheits-Klassifikatoren)",
     )
+    run.add_argument("--upload-gate", default=DetectorUploadGate.name, choices=UPLOAD_GATE_NAMES)
 
     status = command("status", cmd_status, "Stand einer Kampagne anzeigen")
     status.add_argument("--campaign", required=True)
@@ -258,6 +297,22 @@ def main(argv: list[str] | None = None) -> int:
         sub.add_argument("--asset", required=True)
         sub.add_argument("--by", required=True, help="Name der prüfenden Person")
         sub.add_argument("--note", default="")
+
+    upload = command("upload", cmd_upload, "Referenz- oder Produktdatei prüfen und aufnehmen")
+    upload.add_argument("file")
+    upload.add_argument("--campaign", required=True)
+    upload.add_argument("--by", required=True, help="Name der hochladenden Person")
+    upload.add_argument("--purpose", default="reference", choices=("reference", "product"))
+    upload.add_argument("--upload-gate", default=DetectorUploadGate.name, choices=UPLOAD_GATE_NAMES)
+
+    review = command("upload-review", cmd_upload_review, "Über einen Upload entscheiden, den das Gate nicht entscheiden konnte")
+    review.add_argument("--campaign", required=True)
+    review.add_argument("--sha", required=True, help="Kennung des Uploads (Anfang genügt)")
+    review.add_argument("--by", required=True, help="Name der entscheidenden Person")
+    review.add_argument("--note", default="")
+    decision = review.add_mutually_exclusive_group(required=True)
+    decision.add_argument("--accept", action="store_true")
+    decision.add_argument("--reject", action="store_true")
 
     on_version(command("release", cmd_release, "Fassung dem Kunden zeigen"))
     customer = command("customer", cmd_customer, "Entscheidung des Kunden festhalten")
