@@ -2,7 +2,7 @@
 
 System für vollsynthetische Werbebilder. Stand: **Schritte 0, 0b, 1 und 2** (Ablauf mit Test-Engine und C2PA-Signatur; FLUX-Adapter und Wasserzeichen vorbereitet, aber noch nicht mit den echten Modellen gelaufen).
 
-Dokumente: [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/LIZENZPRUEFUNG.md`](docs/LIZENZPRUEFUNG.md), [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md), [`docs/ANFORDERUNGEN.md`](docs/ANFORDERUNGEN.md).
+Dokumente: [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/LIZENZPRUEFUNG.md`](docs/LIZENZPRUEFUNG.md), [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md), [`docs/ANFORDERUNGEN.md`](docs/ANFORDERUNGEN.md), [`docs/LIZENZPRUEFUNG_SCHRITT3.md`](docs/LIZENZPRUEFUNG_SCHRITT3.md).
 
 ## Einrichten
 
