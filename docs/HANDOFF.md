@@ -38,6 +38,7 @@ System für vollsynthetische Werbebilder mit Kindern und Babys für Marken.
 - In der ersten Session waren `bfl.ai` und `huggingface.co` gesperrt. Alle Lizenzaussagen stammen aus Suchtreffern, **nicht** aus den Originaltexten.
 - Die Auftraggeberin hat ein externes Review eingeholt, das die Kernfakten bestätigt; dessen Quellen sind teils Spiegel und Drittseiten und wurden von uns nicht geprüft.
 - **Erste Aufgabe der neuen Session:** die Originaltexte lesen (Abschnitt 7).
+- **Nachtrag zweite Session (11.11.2026):** Die Session lief in der Umgebung „Default“ statt „notpicturedstudio“; `bfl.ai` und `huggingface.co` waren erneut gesperrt. Aufgabe 7.1 und 7.2 sind weiterhin **offen**. Aufgabe 7.3 liegt als vorläufiger Entwurf in `docs/ARCHITECTURE.md` vor (Engine-abhängige Punkte unter Vorbehalt).
 
 ## 3. Modelle (Stand der Recherche)
 
@@ -112,4 +113,4 @@ System für vollsynthetische Werbebilder mit Kindern und Babys für Marken.
 - Cloud-Umgebung **„notpicturedstudio"** ist angelegt und erlaubt `huggingface.co`, `bfl.ai`, `docs.bfl.ml`, `help.bfl.ai`. Die neue Session muss in dieser Umgebung gestartet werden.
 - Für spätere Modell-Downloads werden voraussichtlich weitere Hugging-Face-Download-Hosts nötig; erst bei konkretem Bedarf ergänzen.
 - Die Cloud-Container haben keine GPU: Pipeline-Code hier nur mit Mocks/CPU-Tests, echte Läufe auf EU-GPU.
-- Entwicklungsbranch: `claude/optimistic-meitner-cjeq9a`.
+- Entwicklungsbranch: `claude/handoff-section-7-efkxvb` (zuvor `claude/optimistic-meitner-cjeq9a`).
