@@ -60,7 +60,7 @@ Ergebnis in `out/`: `audit.jsonl` (Hash-Kette), `dossier-<kampagne>.json`, `asse
 
 ## Erster Lauf mit dem echten Modell (EU-GPU)
 
-Braucht eine GPU mit mindestens 16 GB Speicher und Zugriff auf `huggingface.co` für den Download von rund 16 GB.
+Braucht eine GPU (laut Modellkarte etwa 13 GB Grafikspeicher) und Zugriff auf `huggingface.co` für den Download der Gewichte.
 
 ```bash
 .venv/bin/pip install -e ".[gpu]"
