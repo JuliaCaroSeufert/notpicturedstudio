@@ -142,4 +142,4 @@ Kampagne ─> Shooting ─> Motiv ─> Variante ─> Fassung
 
 Schritt 0b kommt neu vor Schritt 1 oder parallel dazu: das Datenmodell Shooting → Motiv → Variante → Fassung mit Fassungsverweisen und Kundenabnahme in der Audit-Kette (läuft ohne GPU). `briefing` und `edit` kommen nach Schritt 4, `formats` nach Schritt 5.
 
-Innerhalb von v1 werden die Altersgruppen gestaffelt freigeschaltet, weil sie unterschiedlich viel voraussetzen: zuerst etwa 2 bis 10 Jahre, dann Säuglinge (brauchen Safe-Pose-Bibliothek und Control-Engine), dann 11 bis 17 Jahre (brauchen strengere Regeln für Kleidung und Posen und ein Safety-Gate, das nicht allein auf Altersschätzung beruht).
+Entschieden am 11.11.2026: v1 deckt nur 2 bis 10 Jahre ab und nur Produkte, die neben dem Kind stehen oder liegen. Säuglinge (brauchen Safe-Pose-Bibliothek und Control-Engine), 11 bis 17 Jahre (brauchen strengere Regeln für Kleidung und Posen) und gehaltene Produkte (brauchen Verdeckungsmasken) folgen in v2. Die Safe-Pose-Bibliothek und die zweite Engine rücken damit aus v1 heraus; Schritt 5 entfällt für v1.

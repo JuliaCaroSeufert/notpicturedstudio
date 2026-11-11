@@ -27,19 +27,13 @@ class ProductCategory(str, Enum):
     UNDERWEAR = "underwear"
 
 
-class AgeGroup(str, Enum):
-    INFANT = "infant"
-    TODDLER = "toddler"
-    CHILD = "child"
-
-
 class BrandSpec(Frozen):
     name: str = Field(min_length=1)
     colors: list[str] = Field(default_factory=list, description="Brand colours as #RRGGBB")
 
 
 class ChildSpec(Frozen):
-    age_group: AgeGroup
+    age_years: int = Field(ge=0, le=17)
     description: str = Field(min_length=1)
 
 

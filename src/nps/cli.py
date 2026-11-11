@@ -22,7 +22,7 @@ DEMO_BRIEF = {
     "product_name": "Holzbauklötze",
     "product_category": "toys",
     "scene": "Helles Kinderzimmer, weiches Tageslicht, Holzboden",
-    "child": {"age_group": "toddler", "description": "sitzt auf dem Boden und stapelt Klötze"},
+    "child": {"age_years": 3, "description": "sitzt auf dem Boden und stapelt Klötze"},
     "width": 768,
     "height": 768,
     "seed": 1234,

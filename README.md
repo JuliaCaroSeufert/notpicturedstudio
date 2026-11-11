@@ -40,7 +40,7 @@ Ergebnis in `out/`: `audit.jsonl` (Hash-Kette), `dossier-<kampagne>.json`, `asse
 
 | Baustein | Stand |
 |---|---|
-| Brief-Prüfung | Windel-, Bade-, Schwimm- und Unterwäsche-Kategorien sowie entsprechende Begriffe im Text werden abgelehnt |
+| Brief-Prüfung | Nur Kinder von 2 bis 10 Jahren. Windel-, Bade-, Schwimm- und Unterwäsche-Kategorien sowie entsprechende Begriffe im Text werden abgelehnt |
 | Engine | nur Test-Engine: abstrakte Farbflächen, deterministisch, keine Menschen |
 | Produkt-Treue | Produkt wird in Originalgröße eingesetzt; Pixelvergleich nach dem Einsetzen und nochmals am fertigen Bild |
 | Safety-Gate | Platzhalter. Standard `block_all` blockiert alles; `mock_only` lässt nur die Test-Engine durch |

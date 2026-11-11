@@ -34,7 +34,7 @@ def build_prompt(brief: Brief) -> str:
     colors = ", ".join(brief.brand.colors)
     parts = [
         brief.scene,
-        f"{brief.child.age_group.value}: {brief.child.description}",
+        f"child, {brief.child.age_years} years old: {brief.child.description}",
         f"brand colours: {colors}" if colors else "",
     ]
     return ". ".join(part for part in parts if part)

@@ -30,9 +30,17 @@ _EXCLUDED_TERMS = re.compile(
 )
 
 
+# v1 covers ages 2 to 10. Infants and ages 11 to 17 follow in v2.
+MIN_AGE_V1, MAX_AGE_V1 = 2, 10
+
+
 def screen_brief(brief: Brief) -> CheckResult:
-    """Reject briefs in categories or contexts that are excluded in v1."""
+    """Reject briefs in categories, contexts or age ranges that are excluded in v1."""
     reasons: list[str] = []
+    if not MIN_AGE_V1 <= brief.child.age_years <= MAX_AGE_V1:
+        reasons.append(
+            f"age {brief.child.age_years} is outside the v1 range {MIN_AGE_V1} to {MAX_AGE_V1}"
+        )
     if brief.product_category in EXCLUDED_CATEGORIES_V1:
         reasons.append(f"product category '{brief.product_category.value}' is excluded in v1")
 

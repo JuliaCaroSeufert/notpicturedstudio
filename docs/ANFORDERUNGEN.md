@@ -15,18 +15,18 @@ Antworten der Auftraggeberin auf die Prozessfragen. Ergänzt den Originalbrief i
 - Eingabe über ein Formular mit festen Feldern, dazu Bild- und Video-Input: Moodboards, Produktbilder, Referenzbilder.
 - Ein Briefing beschreibt ein Shooting mit mehreren Motiven **oder** ein einzelnes Bild. Einzelne Motive können beschrieben werden, müssen aber nicht.
 - Den Detailgrad der Szenenvorgabe wählt der Kunde frei.
-- Referenzbilder ohne Menschen sind erlaubt.
+- Referenzbilder ohne Menschen sind erlaubt. Moodboards und Videos mit Menschen werden abgelehnt; Bilder, die nur das Produkt und keine Gesichter zeigen, sind in Ordnung.
 
 ## Personen im Bild
 
 - Wie ein Marken-Kind festgelegt wird (Kandidatenauswahl pro Kunde oder Katalog synthetischer Modelle), ist **offen**; Pro und Contra werden später abgewogen.
-- Altersspanne: etwa 3 Monate bis 17 Jahre.
+- Altersspanne insgesamt: etwa 3 Monate bis 17 Jahre. **v1: nur 2 bis 10 Jahre**; Säuglinge und 11 bis 17 Jahre in v2.
 - MVP: ein Kind pro Bild, keine Erwachsenen. Später sind Erwachsene und mehrere Personen notwendig.
 
 ## Produkt und Marke
 
-- v1: Produkte, die neben dem Kind stehen, liegen oder von ihm gehalten werden. Getragene Kleidung später.
-- Produktbilder liegen nur als Freisteller aus mehreren Winkeln vor, im Zweifel in Handyqualität. Keine 3D-Daten.
+- v1: Produkte, die neben dem Kind stehen oder liegen. Gehaltene Produkte in v2, getragene Kleidung später.
+- Produktbilder liegen nur als Freisteller aus mehreren Winkeln vor, im Zweifel in Handyqualität. Keine 3D-Daten. Handyqualität muss funktionieren; der Kunde wird über die Grenzen informiert.
 - Markenidentität: Farbwelt, Bildstil, Logo-Regeln. Schriften und Textelemente kommen erst im Layout dazu, nicht ins Bild.
 - Windel-, Bade-, Schwimm- und Unterwäsche-Kontexte sind in v1 ausgeschlossen.
 

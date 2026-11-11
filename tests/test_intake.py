@@ -37,7 +37,7 @@ def test_excluded_contexts_in_the_scene_are_rejected(scene):
 def test_excluded_terms_are_found_in_every_text_field():
     assert not screen_brief(make_brief(product_name="Stoffwindeln")).passed
     assert not screen_brief(
-        make_brief(child={"age_group": "infant", "description": "trägt nur eine Windel"})
+        make_brief(child={"age_years": 2, "description": "trägt nur eine Windel"})
     ).passed
 
 
@@ -51,3 +51,20 @@ def test_excluded_terms_are_found_in_every_text_field():
 )
 def test_harmless_lookalikes_pass(scene):
     assert screen_brief(make_brief(scene=scene)).passed
+
+
+@pytest.mark.parametrize("age", [2, 6, 10])
+def test_ages_in_the_v1_range_pass(age):
+    assert screen_brief(make_brief(child={"age_years": age, "description": "spielt"})).passed
+
+
+@pytest.mark.parametrize("age", [0, 1, 11, 17])
+def test_ages_outside_the_v1_range_are_rejected(age):
+    result = screen_brief(make_brief(child={"age_years": age, "description": "spielt"}))
+    assert not result.passed
+    assert "outside the v1 range" in result.details["reasons"][0]
+
+
+def test_ages_of_adults_are_not_a_valid_child():
+    with pytest.raises(ValueError):
+        make_brief(child={"age_years": 18, "description": "spielt"})

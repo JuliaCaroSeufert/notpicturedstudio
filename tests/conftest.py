@@ -11,7 +11,7 @@ def make_brief(**overrides) -> Brief:
         "product_name": "Holzbauklötze",
         "product_category": "toys",
         "scene": "Helles Kinderzimmer mit Holzboden",
-        "child": {"age_group": "toddler", "description": "stapelt Klötze"},
+        "child": {"age_years": 4, "description": "stapelt Klötze"},
         "width": 256,
         "height": 256,
         "seed": 7,
