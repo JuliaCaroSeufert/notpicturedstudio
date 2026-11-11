@@ -4,16 +4,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 from nps.audit.chain import AuditLog, ChainError
+from nps.core.hashing import sha256_bytes
 from nps.core.models import AssetState, ShootingBrief
 from nps.dossier.build import build_dossier
 from nps.engine.registry import ENGINE_NAMES, engine_by_name
 from nps.pipeline import AssetRecord, Pipeline, PipelineError
+from nps.provenance.c2pa_sign import C2paConfig, C2paSigner, ProvenanceError, read_credentials
+from nps.provenance.devcert import generate_dev_chain
+from nps.provenance.seal import Sealer
+from nps.provenance.watermark import watermarker_by_name
 from nps.safety.gate import BlockAllGate, gate_by_name
 from nps.state import read_campaign
 
@@ -50,7 +56,16 @@ def _pipeline(args: argparse.Namespace) -> Pipeline:
     # Review and client steps never generate, so they get the engine-free defaults.
     engine = engine_by_name(getattr(args, "engine", "mock"))
     gate = gate_by_name(getattr(args, "safety_gate", BlockAllGate.name))
-    return Pipeline(Path(args.out), engine, gate)
+    return Pipeline(Path(args.out), engine, gate, sealer=sealer_from_env())
+
+
+def sealer_from_env() -> Sealer:
+    """Certificate, key and watermark choice come from the environment only."""
+    config = C2paConfig.from_env()
+    return Sealer(
+        signer=C2paSigner(config) if config else None,
+        watermarker=watermarker_by_name(os.environ.get("NPS_WATERMARK")),
+    )
 
 
 def _write_dossier(out: Path, log: AuditLog, campaign_id: str) -> Path:
@@ -150,6 +165,53 @@ def cmd_customer(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dev_cert(args: argparse.Namespace) -> int:
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    chain, key = generate_dev_chain()
+    (out / "dev-chain.pem").write_bytes(chain)
+    key_path = out / "dev-key.pem"
+    key_path.write_bytes(key)
+    key_path.chmod(0o600)
+    print("Testzertifikat erzeugt. Nicht für Auslieferungen verwenden.")
+    print(f"export NPS_C2PA_CERT={out / 'dev-chain.pem'}")
+    print(f"export NPS_C2PA_KEY={key_path}")
+    return 0
+
+
+def cmd_inspect(args: argparse.Namespace) -> int:
+    """Show what a file says about itself and whether the audit chain knows it."""
+    data = Path(args.file).read_bytes()
+    report = read_credentials(data)
+    if report is None:
+        print("C2PA: keine Signatur vorhanden")
+    else:
+        print(f"C2PA: {report.state}" + ("" if report.intact else "  (Datei verändert oder Signatur ungültig)"))
+        print(f"  Signiert von: {report.common_name} / {report.issuer}")
+        print(f"  Quelle: {report.digital_source_type}")
+        print(f"  Asset: {(report.asset or {}).get('asset_id')}")
+        if report.state == "Valid":
+            print("  Hinweis: Zertifikat ist nicht anerkannt (Testzertifikat).")
+
+    known = False
+    if args.campaign:
+        digest = sha256_bytes(data)
+        state = read_campaign(AuditLog(Path(args.out) / "audit.jsonl"), args.campaign)
+        for shooting in state.shootings.values():
+            for motif in shooting.motifs.values():
+                for version in motif.versions:
+                    if version.final_sha256 == digest:
+                        known = True
+                        print(
+                            f"Audit-Kette: unverändert, Shooting {shooting.shooting_id}, "
+                            f"Motiv {motif.motif_id}, Fassung V{version.number} ({version.status.value})"
+                        )
+        if not known:
+            print("Audit-Kette: Datei ist dort nicht als versiegelte Fassung verzeichnet")
+    intact = report is not None and report.intact
+    return 0 if intact and (known or not args.campaign) else 2
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     entries = AuditLog(Path(args.out) / "audit.jsonl").verify()
     print(f"Audit-Kette intakt, {len(entries)} Einträge.")
@@ -204,11 +266,18 @@ def main(argv: list[str] | None = None) -> int:
     customer.add_argument("--comment", default="", help="Anmerkung zur Abnahme")
 
     command("verify", cmd_verify, "Audit-Kette prüfen")
+    command("dev-cert", cmd_dev_cert, "Testzertifikat für die C2PA-Signatur erzeugen")
+    inspect = command("inspect", cmd_inspect, "Signatur einer Bilddatei prüfen und mit der Audit-Kette abgleichen")
+    inspect.add_argument("file")
+    inspect.add_argument("--campaign", help="zusätzlich mit dieser Kampagne abgleichen")
 
     args = parser.parse_args(argv)
     try:
         return args.handler(args)
     except PipelineError as error:
+        print(f"Fehler: {error}", file=sys.stderr)
+        return 1
+    except ProvenanceError as error:
         print(f"Fehler: {error}", file=sys.stderr)
         return 1
     except ChainError as error:

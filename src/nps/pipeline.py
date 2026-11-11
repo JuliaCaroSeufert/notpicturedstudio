@@ -21,8 +21,8 @@ from nps.core.models import (
 )
 from nps.engine.base import Engine, GenerationRequest
 from nps.intake.brief import screen_brief
-from nps.product.composite import composite_product, product_box, verify_product_pixels
-from nps.provenance.label import LABEL_TEXT, apply_visible_label
+from nps.product.composite import composite_product, verify_product_pixels
+from nps.provenance.seal import Sealer
 from nps.safety.gate import SafetyGate
 from nps.state import CampaignState, VersionState, read_campaign
 
@@ -70,10 +70,18 @@ def _require_name(name: str, role: str) -> None:
 
 
 class Pipeline:
-    def __init__(self, out_dir: Path, engine: Engine, gate: SafetyGate, log: AuditLog | None = None):
+    def __init__(
+        self,
+        out_dir: Path,
+        engine: Engine,
+        gate: SafetyGate,
+        log: AuditLog | None = None,
+        sealer: Sealer | None = None,
+    ):
         self._out = Path(out_dir)
         self._engine = engine
         self._gate = gate
+        self._sealer = sealer or Sealer()
         self.log = log or AuditLog(self._out / "audit.jsonl")
 
     # -- storage ---------------------------------------------------------
@@ -323,22 +331,35 @@ class Pipeline:
             },
         )
 
-        labelled, label_box = apply_visible_label(composed, product_box(product, placement))
-        fidelity = verify_product_pixels(labelled, product, placement)
-        if not fidelity.passed:
-            return blocked(fidelity)
+        manifest = variant.manifest or {}
+        sealed = self._sealer.seal(
+            composed,
+            product,
+            placement,
+            asset_id=asset_id,
+            title=f"{campaign_id}-{variant.motif_id}-{asset_id}.png",
+            asset_info={
+                "campaign_id": campaign_id,
+                "engine": manifest.get("engine"),
+                "model_revision": manifest.get("model_revision"),
+                "ai_generated": True,
+            },
+        )
+        if not sealed.passed:
+            return blocked(sealed.checks[-1])
 
         number = len(motif_state.versions) + 1
         final_path = asset_dir / "final.png"
-        labelled.save(final_path)
+        final_path.write_bytes(sealed.png)
         record(
             "asset_sealed",
             {
                 "state": AssetState.SEALED.value,
-                "check": fidelity.model_dump(),
-                "final_sha256": sha256_bytes(final_path.read_bytes()),
-                "label": {"text": LABEL_TEXT, "box": list(label_box)},
-                "provenance": {"visible_label": True, "c2pa": False, "watermark": False},
+                "checks": [check.model_dump() for check in sealed.checks],
+                "final_sha256": sha256_bytes(sealed.png),
+                "final_pixels_sha256": sealed.pixels_sha256,
+                "label": sealed.label,
+                "provenance": sealed.provenance,
                 "version": {
                     "number": number,
                     "parent": latest.number if latest else None,

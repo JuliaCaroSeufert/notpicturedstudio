@@ -1,6 +1,6 @@
 # notpicturedstudio
 
-System für vollsynthetische Werbebilder. Stand: **Schritte 0, 0b und 1** (Ablauf mit Test-Engine; FLUX-Adapter vorbereitet, aber noch nicht auf einer GPU gelaufen).
+System für vollsynthetische Werbebilder. Stand: **Schritte 0, 0b, 1 und 2** (Ablauf mit Test-Engine und C2PA-Signatur; FLUX-Adapter und Wasserzeichen vorbereitet, aber noch nicht mit den echten Modellen gelaufen).
 
 Dokumente: [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/LIZENZPRUEFUNG.md`](docs/LIZENZPRUEFUNG.md), [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md), [`docs/ANFORDERUNGEN.md`](docs/ANFORDERUNGEN.md).
 
@@ -44,6 +44,18 @@ Fassung dem Kunden zeigen und seine Entscheidung festhalten (mit `--changes "...
 .venv/bin/nps customer --out out --campaign demo-herbst --shooting kinderzimmer --motif stapeln --version 1 --by "Dein Name"
 ```
 
+Mit C2PA-Signatur arbeiten: Testzertifikat erzeugen und die beiden ausgegebenen `export`-Zeilen ausführen, bevor du Varianten freigibst.
+
+```bash
+.venv/bin/nps dev-cert --out certs
+```
+
+Eine fertige Datei prüfen (Signatur lesen und mit der Audit-Kette abgleichen):
+
+```bash
+.venv/bin/nps inspect --out out --campaign demo-herbst out/assets/KENNUNG/final.png
+```
+
 Audit-Kette prüfen:
 
 ```bash
@@ -84,6 +96,7 @@ Das Skript erzeugt zweimal dasselbe Stillleben ohne Menschen und prüft, ob beid
 | Interne Freigabe | mit Namen; macht eine Variante zur nächsten Fassung. Eine neue Fassung ist nur nach einem Änderungswunsch des Kunden möglich |
 | Kunde | sieht nur freigegebene Fassungen; Abnahme oder Änderungswunsch wird protokolliert |
 | Korrekturen | bisher nur durch Auswahl einer anderen oder neu erzeugten Variante; gezielte Änderung eines Bildbereichs folgt |
-| Kennzeichnung | nur sichtbares Label links unten; C2PA und Wasserzeichen folgen in Schritt 2 |
+| Kennzeichnung | Sichtbares Label links unten, dann unsichtbares Wasserzeichen, zuletzt C2PA-Signatur. Die Signatur läuft mit Testzertifikat; das Wasserzeichen (TrustMark) ist angebunden, aber hier noch nie mit dem echten Modell gelaufen. Fehlt etwas davon, steht es im Dossier |
 | Audit | Hash-Kette als Datei; Postgres und qualifizierte Zeitstempel folgen später |
+| Konfiguration | Zertifikat, Schlüssel und Wasserzeichen nur über Umgebungsvariablen (`NPS_C2PA_CERT`, `NPS_C2PA_KEY`, `NPS_C2PA_TSA_URL`, `NPS_WATERMARK=trustmark`); nichts davon liegt im Repository |
 | Dossier | JSON, ausschließlich aus der Audit-Kette erzeugt |

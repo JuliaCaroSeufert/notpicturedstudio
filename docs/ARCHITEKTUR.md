@@ -143,3 +143,9 @@ Kampagne ─> Shooting ─> Motiv ─> Variante ─> Fassung
 Schritt 0b kommt neu vor Schritt 1 oder parallel dazu: das Datenmodell Shooting → Motiv → Variante → Fassung mit Fassungsverweisen und Kundenabnahme in der Audit-Kette (läuft ohne GPU). `briefing` und `edit` kommen nach Schritt 4, `formats` nach Schritt 5.
 
 Entschieden am 11.11.2026: v1 deckt nur 2 bis 10 Jahre ab und nur Produkte, die neben dem Kind stehen oder liegen. Säuglinge (brauchen Safe-Pose-Bibliothek und Control-Engine), 11 bis 17 Jahre (brauchen strengere Regeln für Kleidung und Posen) und gehaltene Produkte (brauchen Verdeckungsmasken) folgen in v2. Die Safe-Pose-Bibliothek und die zweite Engine rücken damit aus v1 heraus; Schritt 5 entfällt für v1.
+
+### Kennzeichnung und Produkt-Treue (Schritt 2)
+
+Ein unsichtbares Wasserzeichen verändert alle Pixel geringfügig, also auch die des Produkts. Damit die Regel „Produkt wird nie verändert" exakt gilt, werden die Produktpixel nach dem Einbetten zurückkopiert; danach wird das Wasserzeichen ausgelesen, und wenn es nicht mehr lesbar ist, wird nicht versiegelt. Ob TrustMark das bei großen Produkten im Bild zuverlässig übersteht, zeigt erst der Lauf mit dem echten Modell. Falls nicht, bleibt als Ausweg eine dokumentierte, unsichtbar kleine Toleranz im Produktbereich; das wäre eine Entscheidung der Auftraggeberin.
+
+Die Signatur enthält Kennung, Kampagne, Engine, Modellstand und den Hinweis „KI-generiert", aber keinen Prompt. Ohne Zeitstempel-Dienst (`NPS_C2PA_TSA_URL`) trägt die Signatur keine belegte Zeit; für Auslieferungen wird einer gebraucht, zusammen mit dem anerkannten Zertifikat.

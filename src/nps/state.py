@@ -37,6 +37,7 @@ class VersionState:
     approved_by: str
     note: str
     final_sha256: str
+    final_pixels_sha256: str
     label: dict[str, Any]
     provenance: dict[str, Any]
     released_by: str | None = None
@@ -80,7 +81,9 @@ class CampaignState:
 
 NOTICE_TEST_ENGINE = "Bild stammt aus einer Test-Engine, nicht aus einem Produktionsmodell."
 NOTICE_PLACEHOLDER_GATE = "Safety-Gate ist ein Platzhalter, kein Klassifikator."
-NOTICE_LABEL_ONLY = "Kennzeichnung nur als sichtbares Label; C2PA und Wasserzeichen fehlen noch."
+NOTICE_NO_C2PA = "Mindestens ein Bild ohne C2PA-Signatur."
+NOTICE_UNTRUSTED_C2PA = "C2PA-Signatur mit nicht anerkanntem Zertifikat (Testzertifikat)."
+NOTICE_NO_WATERMARK = "Mindestens ein Bild ohne unsichtbares Wasserzeichen."
 
 
 def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
@@ -128,6 +131,7 @@ def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
             variant.state = AssetState(payload["state"])
         if "check" in payload:
             variant.checks.append(payload["check"])
+        variant.checks.extend(payload.get("checks", []))
         if "manifest" in payload:
             variant.manifest = payload["manifest"]
         if "composed_sha256" in payload:
@@ -141,7 +145,13 @@ def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
 
         motif = state.motif_of(entry.asset_id)
         if entry.event == "asset_sealed":
-            state.notices.add(NOTICE_LABEL_ONLY)
+            provenance = payload["provenance"]
+            if not provenance["c2pa"]:
+                state.notices.add(NOTICE_NO_C2PA)
+            elif provenance["c2pa"]["state"] != "Trusted":
+                state.notices.add(NOTICE_UNTRUSTED_C2PA)
+            if not provenance["watermark"]:
+                state.notices.add(NOTICE_NO_WATERMARK)
             version = payload["version"]
             motif.versions.append(
                 VersionState(
@@ -152,6 +162,7 @@ def read_campaign(log: AuditLog, campaign_id: str) -> CampaignState:
                     approved_by=version["approved_by"],
                     note=version["note"],
                     final_sha256=payload["final_sha256"],
+                    final_pixels_sha256=payload["final_pixels_sha256"],
                     label=payload["label"],
                     provenance=payload["provenance"],
                 )

@@ -247,7 +247,7 @@ def test_dossier_reflects_the_chain(tmp_path, brief, product):
     assert motif["versions"][0]["approved_by"] == "Erika Beispiel"
     assert motif["variants"][0]["state"] == "sealed"
     assert all(check["passed"] for check in motif["variants"][0]["checks"])
-    assert len(dossier["notices"]) == 3
+    assert len(dossier["notices"]) == 4
 
 
 def test_cli_flow(tmp_path, capsys):
