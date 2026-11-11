@@ -106,7 +106,7 @@ Nach jedem Schritt: Tests grün, kurzer Bericht, Freigabe abwarten.
 Blockiert den Start nicht (Schritte 0 bis 2 sind davon unabhängig), muss aber vor dem jeweils genannten Schritt geklärt sein:
 
 1. Schriftliche Klärung mit BFL bzw. Anwalt zur Reichweite der Developer Terms (`LIZENZPRUEFUNG.md` 3.1 und 3.3) – vor Schritt 4.
-2. Windel-, Bade- und ähnliche Kategorien in v1: ausschließen oder höchste Risikostufe – vor Schritt 3.
+2. ~~Windel-, Bade- und ähnliche Kategorien in v1~~ – entschieden am 11.11.2026: in v1 ausgeschlossen, umgesetzt in der Brief-Prüfung (Schritt 0).
 3. Thorn-Angebot und Lizenz für Gesichts-Embeddings: wer holt sie ein – vor Schritt 3 bzw. 6.
 4. C2PA-Signaturzertifikat beschaffen – vor dem ersten echten Kundenbild.
 5. Bria-Vertragsweg oder Bestätigung von FLUX.2 [klein] 4B plus Control-Engine – vor Schritt 1.
