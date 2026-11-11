@@ -20,7 +20,7 @@ def apply_visible_label(
     protected_box: tuple[int, int, int, int],
     text: str = LABEL_TEXT,
 ) -> tuple[Image.Image, tuple[int, int, int, int]]:
-    """Draw the label in the first corner that does not touch the product."""
+    """Draw the label bottom-left, or in the next corner that does not touch the product."""
     font_size = max(12, image.height // 40)
     font = ImageFont.load_default(size=font_size)
     pad = font_size // 2
@@ -29,8 +29,8 @@ def apply_visible_label(
     margin = pad
 
     corners = [
-        (image.width - box_w - margin, image.height - box_h - margin),
         (margin, image.height - box_h - margin),
+        (image.width - box_w - margin, image.height - box_h - margin),
         (image.width - box_w - margin, margin),
         (margin, margin),
     ]

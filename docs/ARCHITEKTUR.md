@@ -110,3 +110,36 @@ Blockiert den Start nicht (Schritte 0 bis 2 sind davon unabhängig), muss aber v
 3. Thorn-Angebot und Lizenz für Gesichts-Embeddings: wer holt sie ein – vor Schritt 3 bzw. 6.
 4. C2PA-Signaturzertifikat beschaffen – vor dem ersten echten Kundenbild.
 5. Bria-Vertragsweg oder Bestätigung von FLUX.2 [klein] 4B plus Control-Engine – vor Schritt 1.
+
+## 8. Anpassungen nach den Prozess-Anforderungen (11.11.2026)
+
+Folgt aus `ANFORDERUNGEN.md`.
+
+### Datenmodell
+
+```
+Kampagne ─> Shooting ─> Motiv ─> Variante ─> Fassung
+                                  (≥ 6 pro Motiv)   (V1, V2, … je Korrektur)
+```
+
+- Ein Shooting hält, was für alle Motive gilt: Marke, Personen, Bildwelt, Produkte.
+- Ein Motiv kann eine eigene Beschreibung haben; fehlt sie, schlägt die Planung Motive aus dem Shooting-Briefing vor.
+- Jede Fassung verweist auf ihre Vorgängerin. Formate (Seitenverhältnisse) sind Ableitungen einer freigegebenen Fassung.
+- Personen sind eine Liste, damit später mehrere Kinder und Erwachsene ohne Umbau möglich sind.
+- Der Kunde sieht nur Fassungen, die intern freigegeben wurden; seine Abnahme ist ein eigener Zustand in der Audit-Kette.
+
+### Neue und geänderte Module
+
+| Modul | Aufgabe |
+|---|---|
+| `briefing` (neu) | Fester Fragenkatalog; unstrukturierte Eingaben (Gesprächsnotiz, Text) werden in die Felder übertragen und von einem Menschen bestätigt, bevor etwas generiert wird. Falls dafür ein Sprachmodell eingesetzt wird, braucht es EU-Hosting und eine eigene Lizenzprüfung. |
+| `intake` (erweitert) | Videos werden in Einzelbilder zerlegt und wie Bilder geprüft. Jede Datei mit erkennbaren Menschen wird abgelehnt, auch Moodboards. |
+| `edit` (neu) | Granulare Korrektur: Aus dem Kommentar wird ein Bildbereich bestimmt und vom Reviewer bestätigt; nur dieser Bereich wird neu erzeugt, alles außerhalb wird pixelgenau aus der Vorgängerfassung übernommen und per Test geprüft. |
+| `product` (erweitert) | Auswahl des passenden Freisteller-Winkels; Verdeckung durch Hände als eigene Maske, damit der Pixeltest gehaltene Produkte prüfen kann. |
+| `formats` (neu) | Seitenverhältnisse als Erweiterung der freigegebenen Fassung um neue Randbereiche, ohne den Kern zu verändern. |
+
+### Reihenfolge
+
+Schritt 0b kommt neu vor Schritt 1 oder parallel dazu: das Datenmodell Shooting → Motiv → Variante → Fassung mit Fassungsverweisen und Kundenabnahme in der Audit-Kette (läuft ohne GPU). `briefing` und `edit` kommen nach Schritt 4, `formats` nach Schritt 5.
+
+Innerhalb von v1 werden die Altersgruppen gestaffelt freigeschaltet, weil sie unterschiedlich viel voraussetzen: zuerst etwa 2 bis 10 Jahre, dann Säuglinge (brauchen Safe-Pose-Bibliothek und Control-Engine), dann 11 bis 17 Jahre (brauchen strengere Regeln für Kleidung und Posen und ein Safety-Gate, das nicht allein auf Altersschätzung beruht).

@@ -44,6 +44,12 @@ def test_label_changes_only_its_own_box():
     assert any(color == (255, 255, 255) for _, color in labelled.crop(box).getcolors(maxcolors=100000))
 
 
+def test_label_sits_bottom_left_by_default():
+    image = Image.new("RGB", (400, 400), (200, 200, 200))
+    _, box = apply_visible_label(image, (300, 0, 400, 100))
+    assert box[0] < 20 and box[3] > 380
+
+
 def test_label_moves_away_from_the_product():
     image = Image.new("RGB", (400, 400), (200, 200, 200))
     _, default_box = apply_visible_label(image, (0, 0, 10, 10))
