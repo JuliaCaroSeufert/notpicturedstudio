@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Frozen(BaseModel):
@@ -32,7 +32,9 @@ class BrandSpec(Frozen):
     colors: list[str] = Field(default_factory=list, description="Brand colours as #RRGGBB")
 
 
-class ChildSpec(Frozen):
+class PersonSpec(Frozen):
+    """A synthetic person in the image. Only children exist so far."""
+
     age_years: int = Field(ge=0, le=17)
     description: str = Field(min_length=1)
 
@@ -44,17 +46,46 @@ class Placement(Frozen):
     y: int = Field(ge=0)
 
 
-class Brief(Frozen):
-    campaign_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{1,63}$")
+_ID = r"^[a-z0-9][a-z0-9_-]{1,63}$"
+
+
+class MotifSpec(Frozen):
+    motif_id: str = Field(pattern=_ID)
+    description: str | None = Field(default=None, min_length=1)
+    placement: Placement
+
+
+class ShootingBrief(Frozen):
+    """One shooting: what all motifs share, plus the motifs themselves.
+
+    A single image is a shooting with one motif.
+    """
+
+    campaign_id: str = Field(pattern=_ID)
+    shooting_id: str = Field(pattern=_ID)
     brand: BrandSpec
     product_name: str = Field(min_length=1)
     product_category: ProductCategory
     scene: str = Field(min_length=1)
-    child: ChildSpec
+    persons: list[PersonSpec] = Field(min_length=1)
     width: int = Field(default=1024, ge=64, le=4096)
     height: int = Field(default=1024, ge=64, le=4096)
-    seed: int = Field(ge=0, lt=2**32)
-    placement: Placement
+    base_seed: int = Field(ge=0, lt=2**32)
+    variants_per_motif: int = Field(default=6, ge=6, le=24)
+    motifs: list[MotifSpec] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _motif_ids_are_unique(self) -> "ShootingBrief":
+        ids = [motif.motif_id for motif in self.motifs]
+        if len(ids) != len(set(ids)):
+            raise ValueError("motif ids must be unique within a shooting")
+        return self
+
+    def motif(self, motif_id: str) -> MotifSpec:
+        for motif in self.motifs:
+            if motif.motif_id == motif_id:
+                return motif
+        raise KeyError(motif_id)
 
 
 class CheckResult(Frozen):
@@ -64,6 +95,8 @@ class CheckResult(Frozen):
 
 
 class AssetState(str, Enum):
+    """State of one generated variant."""
+
     PLANNED = "planned"
     GENERATED = "generated"
     BLOCKED = "blocked"
@@ -71,6 +104,15 @@ class AssetState(str, Enum):
     REJECTED = "rejected"
     APPROVED = "approved"
     SEALED = "sealed"
+
+
+class VersionStatus(str, Enum):
+    """State of a version (V1, V2, ...) of a motif on its way to the client."""
+
+    SEALED = "sealed"
+    RELEASED = "released"
+    CUSTOMER_APPROVED = "customer_approved"
+    CHANGES_REQUESTED = "changes_requested"
 
 
 class Manifest(Frozen):

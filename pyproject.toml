@@ -15,6 +15,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# Only needed where the real model runs. Licences: docs/LIZENZPRUEFUNG.md.
+gpu = [
+    "torch>=2.6",
+    "diffusers>=0.42.1",
+    "transformers",
+    "accelerate>=0.31",
+    "safetensors>=0.8",
+    "huggingface-hub>=1.32",
+]
 
 [project.scripts]
 nps = "nps.cli:main"

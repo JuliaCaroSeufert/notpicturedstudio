@@ -1,25 +1,34 @@
-"""Step-0 pipeline: brief -> generation -> checks -> review -> sealed file."""
+"""Pipeline: shooting brief -> variants -> internal review -> versions -> client decision."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from PIL import Image
 
 from nps.audit.chain import AuditLog
 from nps.core.hashing import sha256_bytes, sha256_image, sha256_json
-from nps.core.models import AssetState, Brief, CheckResult
+from nps.core.models import (
+    AssetState,
+    CheckResult,
+    MotifSpec,
+    ShootingBrief,
+    VersionStatus,
+)
 from nps.engine.base import Engine, GenerationRequest
 from nps.intake.brief import screen_brief
 from nps.product.composite import composite_product, product_box, verify_product_pixels
 from nps.provenance.label import LABEL_TEXT, apply_visible_label
 from nps.safety.gate import SafetyGate
+from nps.state import CampaignState, VersionState, read_campaign
 
 
 class PipelineError(Exception):
-    """The requested step is not allowed in the asset's current state."""
+    """The requested step is not allowed in the current state."""
 
 
 @dataclass(frozen=True)
@@ -27,17 +36,37 @@ class AssetRecord:
     asset_id: str | None
     state: AssetState
     checks: tuple[CheckResult, ...]
+    motif_id: str | None = None
+    variant: int | None = None
     path: Path | None = None
 
 
-def build_prompt(brief: Brief) -> str:
+@dataclass(frozen=True)
+class VersionRecord:
+    motif_id: str
+    number: int
+    asset_id: str
+    status: VersionStatus
+    path: Path | None = None
+
+
+def build_prompt(brief: ShootingBrief, motif: MotifSpec) -> str:
     colors = ", ".join(brief.brand.colors)
-    parts = [
-        brief.scene,
-        f"child, {brief.child.age_years} years old: {brief.child.description}",
-        f"brand colours: {colors}" if colors else "",
-    ]
+    parts = [brief.scene, motif.description or ""]
+    parts += [f"child, {p.age_years} years old: {p.description}" for p in brief.persons]
+    parts.append(f"brand colours: {colors}" if colors else "")
     return ". ".join(part for part in parts if part)
+
+
+def variant_seed(base_seed: int, motif_id: str, index: int) -> int:
+    """Every variant gets its own seed, derived so that reruns give the same one."""
+    digest = hashlib.sha256(f"{base_seed}:{motif_id}:{index}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
+def _require_name(name: str, role: str) -> None:
+    if not name.strip():
+        raise PipelineError(f"a name is required for '{role}'")
 
 
 class Pipeline:
@@ -47,52 +76,132 @@ class Pipeline:
         self._gate = gate
         self.log = log or AuditLog(self._out / "audit.jsonl")
 
+    # -- storage ---------------------------------------------------------
+
     def _asset_dir(self, asset_id: str) -> Path:
         return self._out / "assets" / asset_id
 
-    def _state(self, asset_id: str) -> AssetState | None:
-        state = None
-        for entry in self.log.verify():
-            if entry.asset_id == asset_id and "state" in entry.payload:
-                state = AssetState(entry.payload["state"])
-        return state
+    def _product_path(self, product_sha256: str) -> Path:
+        return self._out / "products" / f"{product_sha256}.png"
 
-    def generate(self, brief: Brief, product: Image.Image) -> AssetRecord:
-        """Run everything up to human review. Never returns an approved asset."""
+    def _load_product(self, product_sha256: str) -> Image.Image:
+        product = Image.open(self._product_path(product_sha256))
+        product.load()
+        if sha256_image(product) != product_sha256:
+            raise PipelineError("stored product image no longer matches its recorded hash")
+        return product
+
+    def state(self, campaign_id: str) -> CampaignState:
+        return read_campaign(self.log, campaign_id)
+
+    # -- generation ------------------------------------------------------
+
+    def generate_shooting(self, brief: ShootingBrief, product: Image.Image) -> list[AssetRecord]:
+        """Register the shooting and generate the configured variants for every motif."""
+        records: list[AssetRecord] = []
+        for motif in brief.motifs:
+            batch = self.generate_variants(brief, product, motif.motif_id)
+            records += batch
+            if batch[0].asset_id is None:
+                break  # the brief itself was rejected
+        return records
+
+    def generate_variants(
+        self, brief: ShootingBrief, product: Image.Image, motif_id: str, count: int | None = None
+    ) -> list[AssetRecord]:
+        """Generate further variants of one motif. Each stops at human review."""
         campaign = brief.campaign_id
         brief_data = brief.model_dump(mode="json")
-        product_sha = sha256_image(product)
+        brief_sha, product_sha = sha256_json(brief_data), sha256_image(product)
+        motif = brief.motif(motif_id)
 
-        screening = screen_brief(brief)
-        if not screening.passed:
+        shooting = self.state(campaign).shootings.get(brief.shooting_id)
+        if shooting is None:
+            screening = screen_brief(brief)
+            if not screening.passed:
+                self.log.append(
+                    campaign_id=campaign,
+                    event="brief_rejected",
+                    payload={
+                        "shooting_id": brief.shooting_id,
+                        "brief": brief_data,
+                        "check": screening.model_dump(),
+                    },
+                )
+                return [AssetRecord(None, AssetState.REJECTED, (screening,))]
+            path = self._product_path(product_sha)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            product.save(path)
             self.log.append(
                 campaign_id=campaign,
-                event="brief_rejected",
-                payload={"brief": brief_data, "check": screening.model_dump()},
+                event="shooting_registered",
+                payload={
+                    "shooting_id": brief.shooting_id,
+                    "brief": brief_data,
+                    "brief_sha256": brief_sha,
+                    "product_sha256": product_sha,
+                    "check": screening.model_dump(),
+                },
             )
-            return AssetRecord(None, AssetState.REJECTED, (screening,))
+            start = 0
+        else:
+            # A registered shooting is frozen. Changes need a new shooting id, so
+            # every image can be traced to exactly one brief.
+            if shooting.brief_sha256 != brief_sha or shooting.product_sha256 != product_sha:
+                raise PipelineError(
+                    f"shooting '{brief.shooting_id}' is already registered with a different "
+                    "brief or product; use a new shooting id"
+                )
+            start = len(shooting.motifs[motif_id].variants)
 
-        asset_id = sha256_json({"brief": brief_data, "product": product_sha})[:16]
-        if self._state(asset_id) is not None:
-            raise PipelineError(f"asset {asset_id} already exists; change the seed for a new one")
+        total = count if count is not None else brief.variants_per_motif
+        return [
+            self._generate_one(brief, product, product_sha, motif, index)
+            for index in range(start, start + total)
+        ]
 
-        def record(event: str, payload: dict) -> None:
-            self.log.append(campaign_id=campaign, asset_id=asset_id, event=event, payload=payload)
+    def _generate_one(
+        self,
+        brief: ShootingBrief,
+        product: Image.Image,
+        product_sha: str,
+        motif: MotifSpec,
+        index: int,
+    ) -> AssetRecord:
+        seed = variant_seed(brief.base_seed, motif.motif_id, index)
+        asset_id = sha256_json(
+            {
+                "campaign": brief.campaign_id,
+                "shooting": brief.shooting_id,
+                "motif": motif.motif_id,
+                "variant": index,
+                "product": product_sha,
+            }
+        )[:16]
+
+        def record(event: str, payload: dict[str, Any]) -> None:
+            self.log.append(
+                campaign_id=brief.campaign_id, asset_id=asset_id, event=event, payload=payload
+            )
+
+        def done(state: AssetState, checks: list[CheckResult], path: Path | None = None) -> AssetRecord:
+            return AssetRecord(asset_id, state, tuple(checks), motif.motif_id, index, path)
 
         record(
             "asset_planned",
             {
                 "state": AssetState.PLANNED.value,
-                "brief": brief_data,
-                "product_sha256": product_sha,
-                "check": screening.model_dump(),
+                "shooting_id": brief.shooting_id,
+                "motif_id": motif.motif_id,
+                "variant": index,
+                "seed": seed,
             },
         )
 
         info = self._engine.describe()
         result = self._engine.generate(
             GenerationRequest(
-                prompt=build_prompt(brief), seed=brief.seed, width=brief.width, height=brief.height
+                prompt=build_prompt(brief, motif), seed=seed, width=brief.width, height=brief.height
             )
         )
         record(
@@ -104,7 +213,7 @@ class Pipeline:
             },
         )
 
-        checks = [screening]
+        checks: list[CheckResult] = []
         safety = self._gate.evaluate(result.image, result.manifest)
         checks.append(safety)
         if not safety.passed:
@@ -117,26 +226,22 @@ class Pipeline:
                     "gate_production": self._gate.production,
                 },
             )
-            return AssetRecord(asset_id, AssetState.BLOCKED, tuple(checks))
+            return done(AssetState.BLOCKED, checks)
         record(
             "safety_passed",
             {"check": safety.model_dump(), "gate_production": self._gate.production},
         )
 
-        composed = composite_product(result.image, product, brief.placement)
-        fidelity = verify_product_pixels(composed, product, brief.placement)
+        composed = composite_product(result.image, product, motif.placement)
+        fidelity = verify_product_pixels(composed, product, motif.placement)
         checks.append(fidelity)
         if not fidelity.passed:
-            record(
-                "asset_blocked",
-                {"state": AssetState.BLOCKED.value, "check": fidelity.model_dump()},
-            )
-            return AssetRecord(asset_id, AssetState.BLOCKED, tuple(checks))
+            record("asset_blocked", {"state": AssetState.BLOCKED.value, "check": fidelity.model_dump()})
+            return done(AssetState.BLOCKED, checks)
 
         asset_dir = self._asset_dir(asset_id)
         asset_dir.mkdir(parents=True, exist_ok=True)
         composed.save(asset_dir / "composed.png")
-        product.save(asset_dir / "product.png")
         (asset_dir / "manifest.json").write_text(
             json.dumps(result.manifest.model_dump(), indent=2), encoding="utf-8"
         )
@@ -148,57 +253,82 @@ class Pipeline:
                 "composed_sha256": sha256_image(composed),
             },
         )
-        return AssetRecord(asset_id, AssetState.IN_REVIEW, tuple(checks), asset_dir / "composed.png")
+        return done(AssetState.IN_REVIEW, checks, asset_dir / "composed.png")
 
-    def review(self, brief: Brief, asset_id: str, reviewer: str, approve: bool, note: str = "") -> AssetRecord:
-        """Record a human decision. Approval seals the asset."""
-        if not reviewer.strip():
-            raise PipelineError("a reviewer name is required")
-        if self._state(asset_id) is not AssetState.IN_REVIEW:
-            raise PipelineError(f"asset {asset_id} is not waiting for review")
+    # -- internal review -------------------------------------------------
 
-        campaign = brief.campaign_id
-        review = {"reviewer": reviewer, "approved": approve, "note": note}
+    def reject_variant(self, campaign_id: str, asset_id: str, reviewer: str, note: str = "") -> AssetRecord:
+        _require_name(reviewer, "reviewer")
+        variant = self._variant_in_review(self.state(campaign_id), asset_id)
+        self.log.append(
+            campaign_id=campaign_id,
+            asset_id=asset_id,
+            event="asset_rejected",
+            payload={
+                "state": AssetState.REJECTED.value,
+                "review": {"reviewer": reviewer, "approved": False, "note": note},
+            },
+        )
+        return AssetRecord(asset_id, AssetState.REJECTED, (), variant.motif_id, variant.index)
 
-        def record(event: str, payload: dict) -> None:
-            self.log.append(campaign_id=campaign, asset_id=asset_id, event=event, payload=payload)
+    def approve_variant(
+        self, campaign_id: str, asset_id: str, reviewer: str, note: str = ""
+    ) -> VersionRecord | AssetRecord:
+        """Approve a variant internally. It is sealed and becomes the motif's next version.
 
-        if not approve:
-            record("asset_rejected", {"state": AssetState.REJECTED.value, "review": review})
-            return AssetRecord(asset_id, AssetState.REJECTED, ())
+        Returns an AssetRecord in state BLOCKED if a check fails during sealing.
+        """
+        _require_name(reviewer, "reviewer")
+        state = self.state(campaign_id)
+        variant = self._variant_in_review(state, asset_id)
+        shooting = state.shootings[variant.shooting_id]
+        motif_state = shooting.motifs[variant.motif_id]
 
+        latest = motif_state.latest_version
+        if latest is not None and latest.status is not VersionStatus.CHANGES_REQUESTED:
+            raise PipelineError(
+                f"motif '{variant.motif_id}' already has version V{latest.number} in state "
+                f"'{latest.status.value}'; a new version needs a change request from the client"
+            )
+
+        def record(event: str, payload: dict[str, Any]) -> None:
+            self.log.append(campaign_id=campaign_id, asset_id=asset_id, event=event, payload=payload)
+
+        def blocked(check: CheckResult) -> AssetRecord:
+            record("asset_blocked", {"state": AssetState.BLOCKED.value, "check": check.model_dump()})
+            return AssetRecord(asset_id, AssetState.BLOCKED, (check,), variant.motif_id, variant.index)
+
+        brief = ShootingBrief.model_validate(shooting.brief)
+        placement = brief.motif(variant.motif_id).placement
+        product = self._load_product(shooting.product_sha256)
         asset_dir = self._asset_dir(asset_id)
         composed = Image.open(asset_dir / "composed.png")
         composed.load()
-        product = Image.open(asset_dir / "product.png")
-        product.load()
 
         # The file on disk must still be the one that passed the checks.
-        expected = next(
-            entry.payload["composed_sha256"]
-            for entry in self.log.verify()
-            if entry.asset_id == asset_id and entry.event == "asset_in_review"
-        )
-        if sha256_image(composed) != expected:
-            record(
-                "asset_blocked",
-                {
-                    "state": AssetState.BLOCKED.value,
-                    "check": CheckResult(
-                        check="stored_image_integrity", passed=False, details={"expected": expected}
-                    ).model_dump(),
-                },
+        if sha256_image(composed) != variant.composed_sha256:
+            return blocked(
+                CheckResult(
+                    check="stored_image_integrity",
+                    passed=False,
+                    details={"expected": variant.composed_sha256},
+                )
             )
-            return AssetRecord(asset_id, AssetState.BLOCKED, ())
 
-        record("asset_approved", {"state": AssetState.APPROVED.value, "review": review})
+        record(
+            "asset_approved",
+            {
+                "state": AssetState.APPROVED.value,
+                "review": {"reviewer": reviewer, "approved": True, "note": note},
+            },
+        )
 
-        labelled, label_box = apply_visible_label(composed, product_box(product, brief.placement))
-        fidelity = verify_product_pixels(labelled, product, brief.placement)
+        labelled, label_box = apply_visible_label(composed, product_box(product, placement))
+        fidelity = verify_product_pixels(labelled, product, placement)
         if not fidelity.passed:
-            record("asset_blocked", {"state": AssetState.BLOCKED.value, "check": fidelity.model_dump()})
-            return AssetRecord(asset_id, AssetState.BLOCKED, (fidelity,))
+            return blocked(fidelity)
 
+        number = len(motif_state.versions) + 1
         final_path = asset_dir / "final.png"
         labelled.save(final_path)
         record(
@@ -209,7 +339,88 @@ class Pipeline:
                 "final_sha256": sha256_bytes(final_path.read_bytes()),
                 "label": {"text": LABEL_TEXT, "box": list(label_box)},
                 "provenance": {"visible_label": True, "c2pa": False, "watermark": False},
+                "version": {
+                    "number": number,
+                    "parent": latest.number if latest else None,
+                    "approved_by": reviewer,
+                    "note": note,
+                },
             },
         )
-        return AssetRecord(asset_id, AssetState.SEALED, (fidelity,), final_path)
+        return VersionRecord(variant.motif_id, number, asset_id, VersionStatus.SEALED, final_path)
 
+    # -- client ----------------------------------------------------------
+
+    def release_version(
+        self, campaign_id: str, shooting_id: str, motif_id: str, number: int, released_by: str
+    ) -> VersionRecord:
+        """Mark a sealed version as shown to the client."""
+        _require_name(released_by, "released_by")
+        version = self._version(campaign_id, shooting_id, motif_id, number, VersionStatus.SEALED)
+        self.log.append(
+            campaign_id=campaign_id,
+            asset_id=version.asset_id,
+            event="version_released",
+            payload={"version": number, "released_by": released_by},
+        )
+        return VersionRecord(motif_id, number, version.asset_id, VersionStatus.RELEASED)
+
+    def customer_decision(
+        self,
+        campaign_id: str,
+        shooting_id: str,
+        motif_id: str,
+        number: int,
+        *,
+        approved: bool,
+        recorded_by: str,
+        comment: str = "",
+    ) -> VersionRecord:
+        """Record the client's approval or change request for a released version."""
+        _require_name(recorded_by, "recorded_by")
+        if not approved and not comment.strip():
+            raise PipelineError("a change request needs a comment")
+        version = self._version(campaign_id, shooting_id, motif_id, number, VersionStatus.RELEASED)
+        self.log.append(
+            campaign_id=campaign_id,
+            asset_id=version.asset_id,
+            event="customer_decision",
+            payload={
+                "version": number,
+                "approved": approved,
+                "comment": comment,
+                "recorded_by": recorded_by,
+            },
+        )
+        status = VersionStatus.CUSTOMER_APPROVED if approved else VersionStatus.CHANGES_REQUESTED
+        return VersionRecord(motif_id, number, version.asset_id, status)
+
+    # -- helpers ---------------------------------------------------------
+
+    @staticmethod
+    def _variant_in_review(state: CampaignState, asset_id: str):
+        variant = state.assets.get(asset_id)
+        if variant is None:
+            raise PipelineError(f"unknown asset {asset_id}")
+        if variant.state is not AssetState.IN_REVIEW:
+            raise PipelineError(
+                f"asset {asset_id} is in state '{variant.state.value}', not waiting for review"
+            )
+        return variant
+
+    def _version(
+        self, campaign_id: str, shooting_id: str, motif_id: str, number: int, required: VersionStatus
+    ) -> VersionState:
+        try:
+            motif = self.state(campaign_id).shootings[shooting_id].motifs[motif_id]
+            version = motif.versions[number - 1] if number >= 1 else None
+        except (KeyError, IndexError):
+            version = None
+        if version is None:
+            raise PipelineError(f"unknown version V{number} of motif '{motif_id}'")
+        if version.status is not required:
+            raise PipelineError(
+                f"version V{number} of motif '{motif_id}' is in state '{version.status.value}', "
+                f"expected '{required.value}'"
+            )
+        return version

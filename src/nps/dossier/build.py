@@ -2,53 +2,50 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from nps.audit.chain import AuditLog
+from nps.state import read_campaign
 
 
 def build_dossier(log: AuditLog, campaign_id: str) -> dict[str, Any]:
-    entries = [entry for entry in log.verify() if entry.campaign_id == campaign_id]
-    assets: dict[str, dict[str, Any]] = {}
-    rejected_briefs: list[dict[str, Any]] = []
-    notices: set[str] = set()
-
-    for entry in entries:
-        if entry.asset_id is None:
-            if entry.event == "brief_rejected":
-                rejected_briefs.append({"timestamp": entry.timestamp, **entry.payload})
-            continue
-        asset = assets.setdefault(
-            entry.asset_id,
-            {"asset_id": entry.asset_id, "state": None, "checks": [], "events": []},
+    state = read_campaign(log, campaign_id)
+    shootings = []
+    for shooting in state.shootings.values():
+        motifs = []
+        for motif in shooting.motifs.values():
+            motifs.append(
+                {
+                    "motif_id": motif.motif_id,
+                    "versions": [
+                        {**asdict(version), "status": version.status.value}
+                        for version in motif.versions
+                    ],
+                    "variants": [
+                        {**asdict(variant), "state": variant.state.value}
+                        for variant in motif.variants
+                    ],
+                }
+            )
+        shootings.append(
+            {
+                "shooting_id": shooting.shooting_id,
+                "brief": shooting.brief,
+                "brief_sha256": shooting.brief_sha256,
+                "product_sha256": shooting.product_sha256,
+                "motifs": motifs,
+            }
         )
-        asset["events"].append(
-            {"seq": entry.seq, "timestamp": entry.timestamp, "event": entry.event, "hash": entry.hash}
-        )
-        payload = entry.payload
-        if "state" in payload:
-            asset["state"] = payload["state"]
-        if "check" in payload:
-            asset["checks"].append(payload["check"])
-        for key in ("brief", "manifest", "review", "final_sha256", "label", "provenance"):
-            if key in payload:
-                asset[key] = payload[key]
-        if payload.get("engine_production") is False:
-            notices.add("Bild stammt aus einer Test-Engine, nicht aus einem Produktionsmodell.")
-        if payload.get("gate_production") is False:
-            notices.add("Safety-Gate ist ein Platzhalter, kein Klassifikator.")
-        if entry.event == "asset_sealed":
-            notices.add("Kennzeichnung nur als sichtbares Label; C2PA und Wasserzeichen fehlen noch.")
-
     return {
         "campaign_id": campaign_id,
         "chain": {
             "verified": True,
             "entries_total": len(log.entries()),
-            "entries_campaign": len(entries),
-            "head_hash": entries[-1].hash if entries else None,
+            "entries_campaign": state.entries,
+            "head_hash": state.head_hash,
         },
-        "notices": sorted(notices),
-        "rejected_briefs": rejected_briefs,
-        "assets": list(assets.values()),
+        "notices": sorted(state.notices),
+        "rejected_briefs": state.rejected_briefs,
+        "shootings": shootings,
     }

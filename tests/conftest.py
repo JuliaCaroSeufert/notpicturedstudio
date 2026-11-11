@@ -1,28 +1,36 @@
 import pytest
 from PIL import Image, ImageDraw
 
-from nps.core.models import Brief
+from nps.core.models import ShootingBrief
 
 
-def make_brief(**overrides) -> Brief:
+def make_brief(**overrides) -> ShootingBrief:
     data = {
         "campaign_id": "test-campaign",
+        "shooting_id": "shooting-a",
         "brand": {"name": "Testmarke", "colors": ["#112233"]},
         "product_name": "Holzbauklötze",
         "product_category": "toys",
         "scene": "Helles Kinderzimmer mit Holzboden",
-        "child": {"age_years": 4, "description": "stapelt Klötze"},
-        "width": 256,
-        "height": 256,
-        "seed": 7,
-        "placement": {"x": 20, "y": 30},
+        "persons": [{"age_years": 4, "description": "stapelt Klötze"}],
+        "width": 128,
+        "height": 128,
+        "base_seed": 7,
+        "motifs": [
+            {"motif_id": "m1", "description": "Kind stapelt", "placement": {"x": 20, "y": 30}},
+            {"motif_id": "m2", "placement": {"x": 60, "y": 10}},
+        ],
     }
     data.update(overrides)
-    return Brief.model_validate(data)
+    return ShootingBrief.model_validate(data)
+
+
+def with_person(**person) -> ShootingBrief:
+    return make_brief(persons=[{"age_years": 4, "description": "spielt", **person}])
 
 
 @pytest.fixture
-def brief() -> Brief:
+def brief() -> ShootingBrief:
     return make_brief()
 
 

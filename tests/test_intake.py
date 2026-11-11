@@ -1,7 +1,7 @@
 import pytest
 
 from nps.intake.brief import screen_brief
-from tests.conftest import make_brief
+from tests.conftest import make_brief, with_person
 
 
 def test_ordinary_brief_passes(brief):
@@ -36,9 +36,11 @@ def test_excluded_contexts_in_the_scene_are_rejected(scene):
 
 def test_excluded_terms_are_found_in_every_text_field():
     assert not screen_brief(make_brief(product_name="Stoffwindeln")).passed
-    assert not screen_brief(
-        make_brief(child={"age_years": 2, "description": "trägt nur eine Windel"})
-    ).passed
+    assert not screen_brief(with_person(description="trägt nur eine Windel")).passed
+    motifs = [{"motif_id": "m1", "description": "Kind in der Badewanne", "placement": {"x": 0, "y": 0}}]
+    result = screen_brief(make_brief(motifs=motifs))
+    assert not result.passed
+    assert "motif 'm1'" in result.details["reasons"][0]
 
 
 @pytest.mark.parametrize(
@@ -55,16 +57,33 @@ def test_harmless_lookalikes_pass(scene):
 
 @pytest.mark.parametrize("age", [2, 6, 10])
 def test_ages_in_the_v1_range_pass(age):
-    assert screen_brief(make_brief(child={"age_years": age, "description": "spielt"})).passed
+    assert screen_brief(with_person(age_years=age)).passed
 
 
 @pytest.mark.parametrize("age", [0, 1, 11, 17])
 def test_ages_outside_the_v1_range_are_rejected(age):
-    result = screen_brief(make_brief(child={"age_years": age, "description": "spielt"}))
+    result = screen_brief(with_person(age_years=age))
     assert not result.passed
     assert "outside the v1 range" in result.details["reasons"][0]
 
 
-def test_ages_of_adults_are_not_a_valid_child():
+def test_adult_age_is_not_a_valid_person_yet():
     with pytest.raises(ValueError):
-        make_brief(child={"age_years": 18, "description": "spielt"})
+        with_person(age_years=18)
+
+
+def test_more_than_one_person_is_rejected_in_v1():
+    persons = [{"age_years": 4, "description": "spielt"}, {"age_years": 6, "description": "liest"}]
+    result = screen_brief(make_brief(persons=persons))
+    assert not result.passed
+    assert "exactly one child" in result.details["reasons"][0]
+
+
+def test_brief_shape_rules():
+    placement = {"x": 0, "y": 0}
+    with pytest.raises(ValueError, match="unique"):
+        make_brief(motifs=[{"motif_id": "m1", "placement": placement}] * 2)
+    with pytest.raises(ValueError):
+        make_brief(motifs=[])
+    with pytest.raises(ValueError):
+        make_brief(variants_per_motif=5)

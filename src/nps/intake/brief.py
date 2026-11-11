@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from nps.core.models import Brief, CheckResult, ProductCategory
+from nps.core.models import CheckResult, ProductCategory, ShootingBrief
 
 EXCLUDED_CATEGORIES_V1 = frozenset(
     {
@@ -34,21 +34,23 @@ _EXCLUDED_TERMS = re.compile(
 MIN_AGE_V1, MAX_AGE_V1 = 2, 10
 
 
-def screen_brief(brief: Brief) -> CheckResult:
-    """Reject briefs in categories, contexts or age ranges that are excluded in v1."""
+def screen_brief(brief: ShootingBrief) -> CheckResult:
+    """Reject shootings in categories, contexts or age ranges that are excluded in v1."""
     reasons: list[str] = []
-    if not MIN_AGE_V1 <= brief.child.age_years <= MAX_AGE_V1:
-        reasons.append(
-            f"age {brief.child.age_years} is outside the v1 range {MIN_AGE_V1} to {MAX_AGE_V1}"
-        )
+    if len(brief.persons) != 1:
+        reasons.append("v1 supports exactly one child per image")
+    for person in brief.persons:
+        if not MIN_AGE_V1 <= person.age_years <= MAX_AGE_V1:
+            reasons.append(
+                f"age {person.age_years} is outside the v1 range {MIN_AGE_V1} to {MAX_AGE_V1}"
+            )
     if brief.product_category in EXCLUDED_CATEGORIES_V1:
         reasons.append(f"product category '{brief.product_category.value}' is excluded in v1")
 
-    for field, text in (
-        ("product_name", brief.product_name),
-        ("scene", brief.scene),
-        ("child.description", brief.child.description),
-    ):
+    texts = [("product_name", brief.product_name), ("scene", brief.scene)]
+    texts += [(f"persons[{i}].description", p.description) for i, p in enumerate(brief.persons)]
+    texts += [(f"motif '{m.motif_id}'", m.description) for m in brief.motifs if m.description]
+    for field, text in texts:
         terms = sorted({match.group(0).lower() for match in _EXCLUDED_TERMS.finditer(text)})
         if terms:
             reasons.append(f"{field} contains excluded terms: {', '.join(terms)}")

@@ -12,6 +12,7 @@ Antworten der Auftraggeberin auf die Prozessfragen. Ergänzt den Originalbrief i
 ## Briefing
 
 - Der Auftrag kommt unstrukturiert an und wird intern ins System übertragen.
+- Das Formular wird in v1 von Hand ausgefüllt; kein Sprachmodell zum Übertragen von Gesprächsnotizen.
 - Eingabe über ein Formular mit festen Feldern, dazu Bild- und Video-Input: Moodboards, Produktbilder, Referenzbilder.
 - Ein Briefing beschreibt ein Shooting mit mehreren Motiven **oder** ein einzelnes Bild. Einzelne Motive können beschrieben werden, müssen aber nicht.
 - Den Detailgrad der Szenenvorgabe wählt der Kunde frei.
@@ -27,6 +28,7 @@ Antworten der Auftraggeberin auf die Prozessfragen. Ergänzt den Originalbrief i
 
 - v1: Produkte, die neben dem Kind stehen oder liegen. Gehaltene Produkte in v2, getragene Kleidung später.
 - Produktbilder liegen nur als Freisteller aus mehreren Winkeln vor, im Zweifel in Handyqualität. Keine 3D-Daten. Handyqualität muss funktionieren; der Kunde wird über die Grenzen informiert.
+- Ein Produktfoto darf als Ganzes angeglichen werden (Helligkeit, Farbstich), wenn das im Dossier steht. Das Produkt selbst muss gleich bleiben: keine andere Farbe, keine andere Form.
 - Markenidentität: Farbwelt, Bildstil, Logo-Regeln. Schriften und Textelemente kommen erst im Layout dazu, nicht ins Bild.
 - Windel-, Bade-, Schwimm- und Unterwäsche-Kontexte sind in v1 ausgeschlossen.
 
