@@ -102,7 +102,7 @@ Eine Referenzdatei prüfen und aufnehmen:
 .venv/bin/nps upload moodboard.png --out out --campaign demo-herbst --by "Dein Name"
 ```
 
-## Erster Lauf mit dem echten Modell (EU-GPU)
+## Erster Lauf mit dem echten Modell (EU-GPU, siehe docs/GPU_EINRICHTUNG.md)
 
 Braucht eine GPU (laut Modellkarte etwa 13 GB Grafikspeicher) und Zugriff auf `huggingface.co` für den Download der Gewichte.
 

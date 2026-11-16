@@ -41,18 +41,19 @@ Dieses Dokument überträgt den Stand in eine neue Session, die direkt auf dem G
 
 ## 4. Aufgaben für die GPU-Session (in dieser Reihenfolge, jeweils mit Checkpoint)
 
-1. **Umgebung:** `python3 -m venv .venv`, dann `.venv/bin/pip install -e ".[dev,gpu,detectors]"`, `nvidia-smi` prüfen, `.venv/bin/python scripts/fetch_models.py`, Tests laufen lassen. Die Hugging-Face-Bibliothek lädt hier normal; in der alten Umgebung war ein Download-Server gesperrt.
+1. **Umgebung:** Der Rechner ist eine OVHcloud-GPU-Instanz (Ubuntu, Benutzer `ubuntu`). Falls `nvidia-smi` nicht läuft, zuerst den NVIDIA-Treiber einrichten; außerdem prüfen, dass von außen nur Port 22 offen ist. Dann `python3 -m venv .venv`, dann `.venv/bin/pip install -e ".[dev,gpu,detectors]"`, `nvidia-smi` prüfen, `.venv/bin/python scripts/fetch_models.py`, Tests laufen lassen. Die Hugging-Face-Bibliothek lädt hier normal; in der alten Umgebung war ein Download-Server gesperrt.
 2. **Erster echter FLUX-Lauf:** `.venv/bin/python scripts/gpu_smoke.py --out smoke`. Erzeugt ein Stillleben ohne Menschen und prüft, ob derselbe Seed dasselbe Bild gibt. Ladezeit, Zeit pro Bild und Speicherbedarf festhalten. Falls der Adapter nicht läuft: korrigieren (er ist nur gegen einen Ersatz getestet).
 3. **Wasserzeichen:** `pip install -e ".[watermark]"`, TrustMark mit echtem Modell prüfen. Kernfrage: Bleibt das Wasserzeichen lesbar, nachdem die Produktpixel zurückkopiert wurden, auch bei großem Produkt? Wenn nicht: der Auftraggeberin die Wahl zwischen kleiner Toleranz im Produktbereich und Verzicht dort vorlegen.
 4. **Schwellen des Safety-Gates** an echten erzeugten Bildern einstellen. Bis dahin gilt für jedes echte Bild: provisorisches Gate plus menschliche Prüfung. Keine problematischen Bilder beschaffen oder erzeugen, um die Erkenner zu testen.
 5. **Referenzbilder und LoRA im FLUX-Adapter** (diffusers 0.42.1 hat `Flux2KleinPipeline` mit `image=`-Referenzen, `Flux2KleinInpaintPipeline` und LoRA-Laden). Danach die Capabilities des Adapters erweitern; das Register lehnt diese Schritte mit FLUX bisher ab.
 6. **Echter LoRA-Trainer** hinter der `Trainer`-Schnittstelle auf FLUX.2 [klein] Base 4B. Vorher prüfen, ob 24 GB reichen; sonst der Auftraggeberin den Wechsel auf L40S vorschlagen.
-7. Erst danach und nur mit ihrem OK: erstes Marken-Kind mit dem echten Modell. **Vorher** muss die BFL-Frage angestoßen sein (Abschnitt 5, Punkt 1).
-8. Danach Schritt 6 der Architektur (Ähnlichkeitsprüfung mit DINOv2, Markenfarben-Check), dann Review-Oberfläche, Dossier als PDF, Regressionssuite, Betrieb.
+7. Der Rechner wird nach jeder Arbeitssitzung gelöscht: vor dem Ende immer committen und pushen, und heruntergeladene Modelle sind beim nächsten Mal neu zu laden.
+8. Erst danach und nur mit ihrem OK: erstes Marken-Kind mit dem echten Modell. **Vorher** muss die BFL-Frage angestoßen sein (Abschnitt 5, Punkt 1).
+9. Danach Schritt 6 der Architektur (Ähnlichkeitsprüfung mit DINOv2, Markenfarben-Check), dann Review-Oberfläche, Dossier als PDF, Regressionssuite, Betrieb.
 
 ## 5. Offene Punkte bei der Auftraggeberin
 
-1. **BFL-Klärung** (vor dem ersten echten Kind): Gelten für selbst betriebenes klein 4B nur Apache 2.0 und die Usage Policy? Erfasst das Upload-Verbot unter 18 auch vollsynthetische Kinder? Sie wollte die E-Mail noch nicht; bei Punkt 7 erneut anbieten.
+1. **BFL-Klärung** (vor dem ersten echten Kind): Gelten für selbst betriebenes klein 4B nur Apache 2.0 und die Usage Policy? Erfasst das Upload-Verbot unter 18 auch vollsynthetische Kinder? Sie wollte die E-Mail noch nicht; bei Punkt 8 erneut anbieten.
 2. **Thorn** (vor dem ersten Kundenbild): Anfrage beim Vertrieb für die selbst betriebene Variante. Angebot aus externem Review, nicht geprüft.
 3. **C2PA:** anerkanntes Zertifikat und Zeitstempel-Dienst vor der ersten Auslieferung.
 4. **Anwalt:** Hände in Referenzfotos (Kinderhand = Foto eines echten Kindes), § 184b StGB und Risikostufen, Anbieter- oder Betreiberrolle nach EU AI Act, Umgang mit blockierten Bildern (löschen oder aufbewahren).

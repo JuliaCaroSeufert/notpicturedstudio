@@ -1,21 +1,22 @@
-# GPU einrichten (Scaleway, Paris)
+# GPU einrichten (OVHcloud, Frankreich)
 
 Ziel: ein gemieteter GPU-Rechner in der EU, auf dem Claude Code direkt läuft. Du arbeitest danach wie gewohnt im Chat weiter, nur dass die Session auf diesem Rechner sitzt und das echte Bildmodell starten kann. Die bisherige Cloud-Session kann fremde Rechner nicht erreichen, deshalb dieser Weg.
 
 Dauer: etwa 30 bis 45 Minuten beim ersten Mal. Du brauchst ein Terminal auf deinem Computer (Mac: Programm „Terminal"; Windows: „PowerShell").
 
-**Nicht an der Quelle geprüft:** Die Scaleway-Website ist aus der Entwicklungsumgebung nicht erreichbar. Preise, Typnamen und Menüpunkte unten stammen aus Drittquellen und aus Erfahrung; die Konsole zeigt dir den tatsächlichen Preis an, bevor du etwas bestätigst.
+**Nicht an der Quelle geprüft:** Die OVHcloud-Website ist aus der Entwicklungsumgebung nicht erreichbar. Menüpfade stammen aus Suchtreffern zur offiziellen OVHcloud-Anleitung, Preise von Vergleichsseiten. Die Konsole zeigt dir den tatsächlichen Preis an, bevor du etwas bestätigst. Die offizielle Anleitung heißt „GPU Instanzen einrichten" und steht unter `docs.ovhcloud.com/de/guides/public-cloud/compute/deploy-a-gpu-instance`.
 
 ## Was es kostet
 
-- Abgerechnet wird nach Laufzeit. Preisvergleichsseiten nennen für den Typ **L4-1-24G** rund 0,80 bis 0,90 € pro Stunde und für **L40S-1-48G** rund 1,50 bis 1,70 € pro Stunde (Stand November 2026).
-- Speicherplatz und öffentliche IP-Adresse kosten zusätzlich einen kleinen Betrag, vermutlich auch bei ausgeschaltetem Rechner.
-- Wichtig: Nach der Arbeit den Rechner ausschalten oder löschen (Schritt 8), sonst läuft die Uhr weiter.
+- Abgerechnet wird nach Laufzeit, wenn du beim Anlegen „stündlich" wählst. Vergleichsseiten nennen für eine **L4** (24 GB) rund 1,00 $ pro Stunde und für eine **L40S** (48 GB) rund 1,80 $ pro Stunde (Stand November 2026).
+- Wichtig: Bei OVHcloud kostet vermutlich auch ein nur ausgeschalteter Rechner weiter. Verlässlich endet die Abrechnung erst, wenn du ihn löschst (Schritt 8).
+- OVHcloud bewirbt ein Startguthaben für das erste Public-Cloud-Projekt. Ob es für dich gilt, zeigt die Konsole.
 
-## 1. Konto anlegen
+## 1. Konto und Projekt anlegen
 
-1. Auf `console.scaleway.com` registrieren, E-Mail bestätigen, Zahlungsmittel hinterlegen.
-2. Scaleway verlangt bei neuen Konten oft eine Identitätsprüfung, bevor GPU-Rechner freigeschaltet sind. Falls beim Anlegen in Schritt 3 die Meldung kommt, dass dein Kontingent nicht reicht: über „Support" ein Ticket öffnen und die Freischaltung von einer GPU-Instanz vom Typ L4 in Paris beantragen.
+1. Auf `ovhcloud.com` ein Kundenkonto anlegen und Zahlungsmittel hinterlegen.
+2. Im Kundencenter oben auf „Public Cloud" gehen und ein Projekt anlegen, zum Beispiel mit dem Namen `notpicturedstudio`.
+3. Falls in Schritt 3 keine GPU-Modelle wählbar sind oder eine Meldung zum Kontingent erscheint: im Projekt unter „Quota and Regions" (bzw. „Kontingente und Regionen") eine Erhöhung beantragen oder ein Support-Ticket öffnen.
 
 ## 2. Zugangsschlüssel erzeugen
 
@@ -31,41 +32,57 @@ Dreimal Enter drücken (Standardort, kein Passwort nötig; ein Passwort ist sich
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Die ausgegebene Zeile kopieren und in der Scaleway-Konsole unter „SSH Keys" (im Bereich Projekt-Einstellungen bzw. Zugangsdaten) einfügen. Nur diese `.pub`-Zeile weitergeben, niemals die Datei ohne `.pub`.
+Die ausgegebene Zeile kopieren. Du fügst sie in Schritt 3 beim Anlegen des Rechners ein (oder vorab im Projekt unter „SSH Keys"). Nur diese `.pub`-Zeile weitergeben, niemals die Datei ohne `.pub`.
 
 ## 3. Rechner anlegen
 
-In der Konsole unter „Instances" → „Create Instance":
+Im Projekt: „Compute" → „Instances" → „Create an instance" (bzw. „Instanz erstellen").
 
 | Einstellung | Wert |
 |---|---|
-| Region / Zone | Paris (PAR-2, bei L4 auch PAR-1) |
-| Typ | **L4-1-24G** (eine GPU mit 24 GB). Reicht für das Bildmodell; falls das Training später zu wenig Speicher hat, wechseln wir auf L40S-1-48G |
-| Betriebssystem | „Ubuntu … GPU OS" (mit vorinstallierten NVIDIA-Treibern) |
-| Speicher | mindestens 150 GB |
+| Modell | Reiter „GPU" bzw. „Cloud GPU": **L4-90** (eine L4 mit 24 GB). Reicht für das Bildmodell; falls das Training später zu wenig Speicher hat, wechseln wir auf **L40S-90** |
+| Region | Gravelines (GRA), Frankreich. Laut OVHcloud sind die meisten GPUs in GRA7, GRA9 und GRA11 verfügbar; nimm die GRA-Region, in der L4 angeboten wird |
+| Image | Ubuntu 24.04 |
+| SSH-Schlüssel | die Zeile aus Schritt 2 einfügen |
+| Netzwerk | öffentlicher Modus („Public mode") |
+| Abrechnung | **stündlich** |
 | Name | z. B. `nps-gpu` |
 
-Anlegen und warten, bis der Status „Running" zeigt. Die öffentliche IP-Adresse notieren.
+Anlegen und warten, bis der Status „Aktiv" zeigt. Die öffentliche IPv4-Adresse notieren.
 
 ## 4. Verbinden
 
+Bei Ubuntu-Images von OVHcloud heißt der Benutzer `ubuntu`:
+
 ```bash
-ssh root@DEINE-IP-ADRESSE
+ssh ubuntu@DEINE-IP-ADRESSE
 ```
 
 Die Rückfrage beim ersten Mal mit `yes` bestätigen. Ab hier laufen alle Befehle auf dem GPU-Rechner.
 
-Prüfen, ob die GPU da ist (es sollte eine Tabelle mit „L4" erscheinen):
+## 5. Werkzeuge und Grafiktreiber installieren
+
+Anders als bei manchen Anbietern ist der NVIDIA-Treiber bei OVHcloud nicht vorinstalliert.
+
+```bash
+sudo apt-get update && sudo apt-get install -y git gh python3-venv tmux ubuntu-drivers-common
+```
+
+```bash
+sudo ubuntu-drivers install
+```
+
+```bash
+sudo reboot
+```
+
+Die Verbindung bricht dabei ab. Nach etwa einer Minute neu verbinden (Schritt 4) und prüfen, ob die GPU da ist; es sollte eine Tabelle mit „L4" erscheinen:
 
 ```bash
 nvidia-smi
 ```
 
-## 5. Werkzeuge installieren
-
-```bash
-apt-get update && apt-get install -y git gh python3-venv tmux
-```
+Falls `nvidia-smi` einen Fehler zeigt: trotzdem weitermachen und es der Session in Schritt 7 als Erstes sagen; sie kann den Treiber selbst einrichten.
 
 Claude Code installieren:
 
@@ -73,7 +90,7 @@ Claude Code installieren:
 curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-Falls danach der Befehl `claude` nicht gefunden wird: einmal `exit` eingeben, neu verbinden (Schritt 4) und erneut versuchen. Die offizielle Anleitung steht unter `code.claude.com/docs`.
+Falls danach der Befehl `claude` nicht gefunden wird: einmal `exit` eingeben, neu verbinden und erneut versuchen. Die offizielle Anleitung steht unter `code.claude.com/docs`.
 
 ## 6. Projekt holen
 
@@ -117,16 +134,18 @@ Wenn du lieber wie bisher in der App statt im Terminal schreiben willst, starte 
 claude remote-control
 ```
 
-Der Rechner erscheint dann in der Claude-Code-App, und du führst die Unterhaltung von dort. (Nach einem Verbindungsabbruch kommst du mit `ssh root@DEINE-IP-ADRESSE` und dann `tmux attach -t nps` zurück.)
+Der Rechner erscheint dann in der Claude-Code-App, und du führst die Unterhaltung von dort. (Nach einem Verbindungsabbruch kommst du mit `ssh ubuntu@DEINE-IP-ADRESSE` und dann `tmux attach -t nps` zurück.)
 
-## 8. Nach der Arbeit: ausschalten
+## 8. Nach der Arbeit: löschen
 
 1. In der Session darum bitten, alles zu committen und zu pushen. Was nicht auf GitHub liegt, ist nach dem Löschen des Rechners weg.
-2. In der Scaleway-Konsole den Rechner ausschalten („Power off") oder löschen. Beim Löschen auch Speicher und IP-Adresse mit entfernen, sonst kosten sie weiter.
-3. In der Abrechnungsübersicht kontrollieren, dass nichts mehr läuft.
+2. Im Kundencenter unter „Instances" den Rechner **löschen**. Nur ausschalten reicht bei OVHcloud vermutlich nicht, um die Kosten zu stoppen.
+3. Unter „Billing" bzw. „Abrechnung" im Projekt kontrollieren, dass nichts mehr läuft.
+
+Beim nächsten Mal legst du einen neuen Rechner an und wiederholst die Schritte 3 bis 7; Konto, Projekt und Schlüssel bleiben bestehen. Das dauert dann etwa 15 Minuten.
 
 ## Sicherheit
 
-- Der Rechner kennt nach der Einrichtung dein GitHub- und dein Claude-Login. Wenn du ihn länger nicht brauchst: löschen statt nur ausschalten.
-- In der Konsole unter „Security Groups" nur den SSH-Zugang (Port 22) von außen erlauben.
-- Auf dem Rechner entstehen später die echten Bilder. Er steht in Paris; die Bilder verlassen ihn nur, wenn sie ausgeliefert werden.
+- Der Rechner kennt nach der Einrichtung dein GitHub- und dein Claude-Login. Durch das Löschen nach der Arbeit sind beide wieder weg.
+- Von außen sollte nur der SSH-Zugang (Port 22) erreichbar sein. Die Session auf dem Rechner kann das als Erstes prüfen und einstellen.
+- Auf dem Rechner entstehen später die echten Bilder. Er steht in Frankreich; die Bilder verlassen ihn nur, wenn sie ausgeliefert werden.
