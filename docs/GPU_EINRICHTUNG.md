@@ -1,88 +1,88 @@
-# GPU einrichten (OVHcloud, Frankreich)
+# GPU einrichten (IONOS Cloud, Frankfurt)
 
-Ziel: ein gemieteter GPU-Rechner in der EU, auf dem Claude Code direkt läuft. Du arbeitest danach wie gewohnt im Chat weiter, nur dass die Session auf diesem Rechner sitzt und das echte Bildmodell starten kann. Die bisherige Cloud-Session kann fremde Rechner nicht erreichen, deshalb dieser Weg.
+Ziel: ein gemieteter GPU-Rechner in Deutschland, auf dem Claude Code direkt läuft. Du arbeitest danach wie gewohnt im Chat weiter, nur dass die Session auf diesem Rechner sitzt und das echte Bildmodell starten kann. Die bisherige Cloud-Session kann fremde Rechner nicht erreichen, deshalb dieser Weg.
 
-Dauer: etwa 30 bis 45 Minuten beim ersten Mal. Du brauchst ein Terminal auf deinem Computer (Mac: Programm „Terminal"; Windows: „PowerShell").
+Plan: Für den Aufbau des MVP stundenweise bei IONOS. Später, wenn die GPU regelmäßig gebraucht wird, ein fester Monatsserver bei Hetzner.
 
-**Nicht an der Quelle geprüft:** Die OVHcloud-Website ist aus der Entwicklungsumgebung nicht erreichbar. Menüpfade stammen aus Suchtreffern zur offiziellen OVHcloud-Anleitung, Preise von Vergleichsseiten. Die Konsole zeigt dir den tatsächlichen Preis an, bevor du etwas bestätigst. Die offizielle Anleitung heißt „GPU Instanzen einrichten" und steht unter `docs.ovhcloud.com/de/guides/public-cloud/compute/deploy-a-gpu-instance`.
+Du brauchst ein Terminal auf deinem Computer (Mac: Programm „Terminal"; Windows: „PowerShell").
+
+**Nicht an der Quelle geprüft:** Die IONOS-Seiten sind aus der Entwicklungsumgebung nicht erreichbar. Die Angaben unten stammen aus Suchtreffern zur IONOS-Dokumentation und aus allgemeiner Kenntnis der IONOS-Oberfläche. Stellen, an denen ich unsicher bin, sind mit **(unsicher)** markiert. Die offizielle Anleitung steht unter `docs.ionos.com/cloud/compute-services/compute-engine/cloud-gpu-vm`.
 
 ## Was es kostet
 
-- Abgerechnet wird nach Laufzeit, wenn du beim Anlegen „stündlich" wählst. Vergleichsseiten nennen für eine **L4** (24 GB) rund 1,00 $ pro Stunde und für eine **L40S** (48 GB) rund 1,80 $ pro Stunde (Stand November 2026).
-- Wichtig: Bei OVHcloud kostet vermutlich auch ein nur ausgeschalteter Rechner weiter. Verlässlich endet die Abrechnung erst, wenn du ihn löschst (Schritt 8).
-- OVHcloud bewirbt ein Startguthaben für das erste Public-Cloud-Projekt. Ob es für dich gilt, zeigt die Konsole.
+- Die kleinste GPU-Vorlage heißt **H200-S**: eine NVIDIA H200, 15 Prozessorkerne, 267 GB Arbeitsspeicher, 1024 GB Speicherplatz. Laut IONOS-Preisliste **3,00 € pro Stunde**.
+- Die H200 ist für unsere Zwecke überdimensioniert, reicht dafür aber sicher für Bilderzeugung und Training.
+- **(unsicher)** Bei IONOS kostet ein nur gestoppter Rechner in der Regel weiter. Verlässlich endet die Abrechnung erst, wenn du ihn löschst (Schritt 8). Zehn Stunden Arbeit kosten dann rund 30 €; ein vergessener Rechner kostet rund 72 € pro Tag.
 
-## 1. Konto und Projekt anlegen
+## 1. Konto anlegen
 
-1. Auf `ovhcloud.com` ein Kundenkonto anlegen und Zahlungsmittel hinterlegen.
-2. Im Kundencenter oben auf „Public Cloud" gehen und ein Projekt anlegen, zum Beispiel mit dem Namen `notpicturedstudio`.
-3. Falls in Schritt 3 keine GPU-Modelle wählbar sind oder eine Meldung zum Kontingent erscheint: im Projekt unter „Quota and Regions" (bzw. „Kontingente und Regionen") eine Erhöhung beantragen oder ein Support-Ticket öffnen.
+1. Ein Konto für **IONOS Cloud** anlegen (`cloud.ionos.de`). Das ist ein anderer Bereich als das normale IONOS-Hosting für Websites und Domains; ein vorhandenes Hosting-Konto reicht nicht.
+2. **(unsicher)** IONOS prüft neue Cloud-Konten teils per Rückruf oder E-Mail, bevor Ressourcen freigeschaltet sind.
+3. Standardmäßig ist genau ein GPU-Rechner der Größe H200-S erlaubt. Das genügt. Falls beim Anlegen trotzdem eine Meldung zum Limit erscheint, den IONOS-Support um Freischaltung von „1 × Cloud GPU VM H200-S in Frankfurt" bitten.
 
 ## 2. Zugangsschlüssel erzeugen
 
-Auf deinem Computer im Terminal:
+Falls du das schon für einen anderen Anbieter gemacht hast, kannst du denselben Schlüssel wiederverwenden und direkt die zweite Zeile ausführen.
 
 ```bash
 ssh-keygen -t ed25519 -C "notpicturedstudio"
 ```
 
-Dreimal Enter drücken (Standardort, kein Passwort nötig; ein Passwort ist sicherer). Dann den öffentlichen Teil anzeigen:
+Dreimal Enter drücken. Dann den öffentlichen Teil anzeigen:
 
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Die ausgegebene Zeile kopieren. Du fügst sie in Schritt 3 beim Anlegen des Rechners ein (oder vorab im Projekt unter „SSH Keys"). Nur diese `.pub`-Zeile weitergeben, niemals die Datei ohne `.pub`.
+Die ausgegebene Zeile kopieren. In der IONOS-Oberfläche (dem „Data Center Designer", kurz DCD) oben im Menü unter „Manager" → „SSH Keys" (bzw. „SSH-Schlüssel") eintragen und als Standard markieren. Nur diese `.pub`-Zeile weitergeben, niemals die Datei ohne `.pub`.
 
 ## 3. Rechner anlegen
 
-Im Projekt: „Compute" → „Instances" → „Create an instance" (bzw. „Instanz erstellen").
+Im DCD arbeitest du auf einer Zeichenfläche: Elemente werden hineingezogen, verbunden und am Ende gemeinsam bereitgestellt.
 
-| Einstellung | Wert |
-|---|---|
-| Modell | Reiter „GPU" bzw. „Cloud GPU": **L4-90** (eine L4 mit 24 GB). Reicht für das Bildmodell; falls das Training später zu wenig Speicher hat, wechseln wir auf **L40S-90** |
-| Region | Gravelines (GRA), Frankreich. Laut OVHcloud sind die meisten GPUs in GRA7, GRA9 und GRA11 verfügbar; nimm die GRA-Region, in der L4 angeboten wird |
-| Image | Ubuntu 24.04 |
-| SSH-Schlüssel | die Zeile aus Schritt 2 einfügen |
-| Netzwerk | öffentlicher Modus („Public mode") |
-| Abrechnung | **stündlich** |
-| Name | z. B. `nps-gpu` |
+1. Ein neues virtuelles Rechenzentrum anlegen: Name `notpicturedstudio`, Standort **Frankfurt (de/fra/2)**. Laut IONOS gibt es die GPU-Rechner derzeit nur dort.
+2. Aus der linken Leiste das Element **„GPU VM"** (bzw. „Cloud GPU VM") auf die Fläche ziehen.
+3. Das Element anklicken. Rechts im Bereich „Inspector":
+   - Name: `nps-gpu`
+   - Template: **H200-S**
+   - Beim Speicher als Image **Ubuntu 24.04** wählen und deinen SSH-Schlüssel auswählen.
+4. Aus der linken Leiste das Element **„Internet Access"** auf die Fläche ziehen und per Linie mit dem Rechner verbinden. Dadurch bekommt er eine Netzwerkkarte mit öffentlicher Adresse.
+5. Oben auf **„Provision changes"** (bzw. „Änderungen bereitstellen") klicken, die Prüfung ansehen und mit deinem Passwort bestätigen.
+6. Warten, bis die Bereitstellung fertig ist. Dann den Rechner anklicken und im Inspector unter „Network" die öffentliche IPv4-Adresse notieren.
 
-Anlegen und warten, bis der Status „Aktiv" zeigt. Die öffentliche IPv4-Adresse notieren.
+**(unsicher)** Eine IONOS-Seite sagt, die GPU-Rechner ließen sich nur über die Programmierschnittstelle anlegen, eine andere beschreibt den Weg über den DCD wie oben. Wenn du das Element „GPU VM" in der linken Leiste nicht findest, schick mir einen Screenshot des DCD.
 
 ## 4. Verbinden
 
-Bei Ubuntu-Images von OVHcloud heißt der Benutzer `ubuntu`:
+Bei IONOS-Images ist der Benutzer in der Regel `root`:
 
 ```bash
-ssh ubuntu@DEINE-IP-ADRESSE
+ssh root@DEINE-IP-ADRESSE
 ```
 
-Die Rückfrage beim ersten Mal mit `yes` bestätigen. Ab hier laufen alle Befehle auf dem GPU-Rechner.
+Die Rückfrage beim ersten Mal mit `yes` bestätigen. Falls die Anmeldung als `root` abgelehnt wird, versuche `ubuntu@DEINE-IP-ADRESSE`. Ab hier laufen alle Befehle auf dem GPU-Rechner.
 
-## 5. Werkzeuge und Grafiktreiber installieren
+## 5. Werkzeuge installieren
 
-Anders als bei manchen Anbietern ist der NVIDIA-Treiber bei OVHcloud nicht vorinstalliert.
-
-```bash
-sudo apt-get update && sudo apt-get install -y git gh python3-venv tmux ubuntu-drivers-common
-```
-
-```bash
-sudo ubuntu-drivers install
-```
-
-```bash
-sudo reboot
-```
-
-Die Verbindung bricht dabei ab. Nach etwa einer Minute neu verbinden (Schritt 4) und prüfen, ob die GPU da ist; es sollte eine Tabelle mit „L4" erscheinen:
+Zuerst prüfen, ob der Grafiktreiber schon da ist:
 
 ```bash
 nvidia-smi
 ```
 
-Falls `nvidia-smi` einen Fehler zeigt: trotzdem weitermachen und es der Session in Schritt 7 als Erstes sagen; sie kann den Treiber selbst einrichten.
+Erscheint eine Tabelle mit „H200", ist alles gut. Erscheint „command not found", den Treiber installieren und neu starten:
+
+```bash
+apt-get update && apt-get install -y ubuntu-drivers-common && ubuntu-drivers install && reboot
+```
+
+Nach etwa einer Minute neu verbinden (Schritt 4). Falls `nvidia-smi` danach immer noch einen Fehler zeigt: trotzdem weitermachen und es der Session in Schritt 7 als Erstes sagen.
+
+Dann die Werkzeuge:
+
+```bash
+apt-get update && apt-get install -y git gh python3-venv tmux
+```
 
 Claude Code installieren:
 
@@ -91,6 +91,8 @@ curl -fsSL https://claude.ai/install.sh | bash
 ```
 
 Falls danach der Befehl `claude` nicht gefunden wird: einmal `exit` eingeben, neu verbinden und erneut versuchen. Die offizielle Anleitung steht unter `code.claude.com/docs`.
+
+(Wenn du als `ubuntu` statt `root` angemeldet bist, vor die `apt-get`-, `ubuntu-drivers`- und `reboot`-Befehle jeweils `sudo` setzen.)
 
 ## 6. Projekt holen
 
@@ -134,18 +136,18 @@ Wenn du lieber wie bisher in der App statt im Terminal schreiben willst, starte 
 claude remote-control
 ```
 
-Der Rechner erscheint dann in der Claude-Code-App, und du führst die Unterhaltung von dort. (Nach einem Verbindungsabbruch kommst du mit `ssh ubuntu@DEINE-IP-ADRESSE` und dann `tmux attach -t nps` zurück.)
+Der Rechner erscheint dann in der Claude-Code-App, und du führst die Unterhaltung von dort. (Nach einem Verbindungsabbruch kommst du mit `ssh root@DEINE-IP-ADRESSE` und dann `tmux attach -t nps` zurück.)
 
 ## 8. Nach der Arbeit: löschen
 
-1. In der Session darum bitten, alles zu committen und zu pushen. Was nicht auf GitHub liegt, ist nach dem Löschen des Rechners weg.
-2. Im Kundencenter unter „Instances" den Rechner **löschen**. Nur ausschalten reicht bei OVHcloud vermutlich nicht, um die Kosten zu stoppen.
-3. Unter „Billing" bzw. „Abrechnung" im Projekt kontrollieren, dass nichts mehr läuft.
+1. In der Session darum bitten, alles zu committen und zu pushen. Was nicht auf GitHub liegt, ist nach dem Löschen weg.
+2. Im DCD den Rechner auf der Fläche anklicken, löschen und wieder **„Provision changes"** bestätigen. Erst mit der Bereitstellung ist er wirklich weg. Das leere Rechenzentrum kann bestehen bleiben.
+3. Im Menü unter „Kosten" bzw. „Billing" kontrollieren, dass nichts mehr läuft.
 
-Beim nächsten Mal legst du einen neuen Rechner an und wiederholst die Schritte 3 bis 7; Konto, Projekt und Schlüssel bleiben bestehen. Das dauert dann etwa 15 Minuten.
+Beim nächsten Mal wiederholst du die Schritte 3 bis 7; Konto und Schlüssel bleiben bestehen.
 
 ## Sicherheit
 
 - Der Rechner kennt nach der Einrichtung dein GitHub- und dein Claude-Login. Durch das Löschen nach der Arbeit sind beide wieder weg.
-- Von außen sollte nur der SSH-Zugang (Port 22) erreichbar sein. Die Session auf dem Rechner kann das als Erstes prüfen und einstellen.
-- Auf dem Rechner entstehen später die echten Bilder. Er steht in Frankreich; die Bilder verlassen ihn nur, wenn sie ausgeliefert werden.
+- Von außen sollte nur der SSH-Zugang (Port 22) erreichbar sein. Die Session auf dem Rechner prüft das als Erstes.
+- Auf dem Rechner entstehen später die echten Bilder. Er steht in Frankfurt; die Bilder verlassen ihn nur, wenn sie ausgeliefert werden.
