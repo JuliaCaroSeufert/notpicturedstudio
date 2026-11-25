@@ -40,17 +40,18 @@ Die ausgegebene Zeile kopieren. In der IONOS-Oberfläche (dem „Data Center Des
 
 Im DCD arbeitest du auf einer Zeichenfläche: Elemente werden hineingezogen, verbunden und am Ende gemeinsam bereitgestellt.
 
-1. Ein neues virtuelles Rechenzentrum anlegen: Name `notpicturedstudio`, Standort **Frankfurt (de/fra/2)**. Laut IONOS gibt es die GPU-Rechner derzeit nur dort.
-2. Aus der linken Leiste das Element **„GPU VM"** (bzw. „Cloud GPU VM") auf die Fläche ziehen.
-3. Das Element anklicken. Rechts im Bereich „Inspector":
+1. Falls oben ein Hinweis „Vollversion freischalten" erscheint: zuerst freischalten. Im Testmodus sind GPU-Rechner vermutlich nicht verfügbar. IONOS gibt dabei 200 € Startguthaben (Stand November 2026), das sind rund 66 Stunden H200.
+2. Ein neues virtuelles Rechenzentrum anlegen: Name `notpicturedstudio`, Standort **Deutschland / Frankfurt am Main (de/fra/2)**. Laut IONOS gibt es die GPU-Rechner nur dort (und in Worcester, UK); **de/fra/1 hat keine**. Der Standort lässt sich nachträglich nicht ändern; ein Rechenzentrum am falschen Standort, das noch „Unprovisioniert" ist, kann man kostenlos löschen.
+3. Aus der linken Leiste („Palette", ggf. nach unten scrollen) das Element **„Cloud GPU"** auf die Fläche ziehen.
+4. Das Element anklicken. Rechts im Bereich „Inspector":
    - Name: `nps-gpu`
    - Template: **H200-S**
    - Beim Speicher als Image **Ubuntu 24.04** wählen und deinen SSH-Schlüssel auswählen.
-4. Aus der linken Leiste das Element **„Internet Access"** auf die Fläche ziehen und per Linie mit dem Rechner verbinden. Dadurch bekommt er eine Netzwerkkarte mit öffentlicher Adresse.
-5. Oben auf **„Provision changes"** (bzw. „Änderungen bereitstellen") klicken, die Prüfung ansehen und mit deinem Passwort bestätigen.
-6. Warten, bis die Bereitstellung fertig ist. Dann den Rechner anklicken und im Inspector unter „Network" die öffentliche IPv4-Adresse notieren.
+5. Aus der linken Leiste das Element **„Internet"** auf die Fläche ziehen und per Linie mit dem Rechner verbinden. Dadurch bekommt er eine Netzwerkkarte mit öffentlicher Adresse.
+6. Unten rechts auf **„Änderungen bereitstellen"** klicken, die Prüfung ansehen und mit deinem Passwort bestätigen.
+7. Warten, bis die Bereitstellung fertig ist. Dann den Rechner anklicken und im Inspector unter „Network" die öffentliche IPv4-Adresse notieren.
 
-**(unsicher)** Eine IONOS-Seite sagt, die GPU-Rechner ließen sich nur über die Programmierschnittstelle anlegen, eine andere beschreibt den Weg über den DCD wie oben. Wenn du das Element „GPU VM" in der linken Leiste nicht findest, schick mir einen Screenshot des DCD.
+Ab der Bereitstellung läuft die Abrechnung. Wenn du das Element „Cloud GPU" in der Palette nicht findest, liegt es meist am Standort oder am Testmodus.
 
 ## 4. Verbinden
 
