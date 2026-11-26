@@ -147,6 +147,48 @@ Der Rechner erscheint dann in der Claude-Code-App, und du führst die Unterhaltu
 
 Beim nächsten Mal wiederholst du die Schritte 3 bis 7; Konto und Schlüssel bleiben bestehen.
 
+## Alltag: Arbeitssitzung beginnen und beenden
+
+Nach der ersten Einrichtung bleibt alles auf dem Rechner, solange du ihn nur ausschaltest und nicht löschst.
+
+**Beginnen**
+
+1. IONOS-Rechenzentrum öffnen, GPU-Rechner anklicken, „Power" → „Start". Warten, bis „Läuft" dasteht, dann noch zwei bis drei Minuten.
+2. Unter „Netzwerk" die IPv4-Adresse prüfen. Sie kann sich nach dem Ausschalten ändern.
+3. In PowerShell verbinden:
+
+```powershell
+ssh root@DEINE-IP-ADRESSE
+```
+
+4. Sitzungsfenster öffnen, in den Projektordner wechseln, den neuesten Stand holen:
+
+```bash
+tmux new -s nps
+```
+
+```bash
+cd ~/notpicturedstudio && git pull
+```
+
+5. Claude Code starten. Mit `--continue` geht es in der letzten Unterhaltung weiter; ohne startet eine neue.
+
+```bash
+claude --continue
+```
+
+**Beenden**
+
+1. In Claude Code schreiben: „Bitte alles committen und pushen und kurz notieren, wo wir stehen."
+2. Wenn das erledigt ist, Claude Code mit `/exit` beenden und die Verbindung mit `exit` (zweimal: einmal für tmux, einmal für SSH).
+3. IONOS: GPU-Rechner anklicken, „Power" → „Stop". Warten, bis der Zustand nicht mehr „Läuft" zeigt.
+
+**Wenn etwas anders ist als sonst**
+
+- Neue IP-Adresse: Beim ersten Verbinden fragt PowerShell wieder „Are you sure…?"; mit `yes` bestätigen.
+- Meldung „REMOTE HOST IDENTIFICATION HAS CHANGED": Nicht einfach weitermachen, sondern melden. Das passiert, wenn der Rechner neu angelegt wurde, kann aber auch auf ein Problem hinweisen.
+- Verbindung bricht mitten in der Arbeit ab: neu verbinden und `tmux attach -t nps`. Claude Code hat in der Zwischenzeit weitergearbeitet.
+
 ## Sicherheit
 
 - Der Rechner kennt nach der Einrichtung dein GitHub- und dein Claude-Login. Durch das Löschen nach der Arbeit sind beide wieder weg.
