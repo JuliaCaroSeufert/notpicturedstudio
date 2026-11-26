@@ -177,10 +177,18 @@ cd ~/notpicturedstudio && git pull
 claude --continue
 ```
 
+Wer lieber in der Claude-App schreibt (dort klappt auch das Einfügen problemlos), startet stattdessen:
+
+```bash
+claude remote-control
+```
+
+Danach kann das PowerShell-Fenster geschlossen werden; die Sitzung läuft in tmux weiter und erscheint in der App. Falls sie dort als neue Unterhaltung startet, als Erstes schreiben: „Lies docs/HANDOFF.md und deine Notizen vom letzten Mal und mach weiter."
+
 **Beenden**
 
 1. In Claude Code schreiben: „Bitte alles committen und pushen und kurz notieren, wo wir stehen."
-2. Wenn das erledigt ist, Claude Code mit `/exit` beenden und die Verbindung mit `exit` (zweimal: einmal für tmux, einmal für SSH).
+2. Wenn das erledigt ist, Claude Code beenden (im Terminal `/exit`, bei Remote Control dort `Strg+C`) und die Verbindung mit `exit` (zweimal: einmal für tmux, einmal für SSH).
 3. IONOS: GPU-Rechner anklicken, „Power" → „Stop". Warten, bis der Zustand nicht mehr „Läuft" zeigt.
 
 **Wenn etwas anders ist als sonst**
