@@ -1,0 +1,14 @@
+{
+  "campaign_id": "test-puppenhaus",
+  "shooting_id": "wohnzimmer-1",
+  "brand": {"name": "Testmarke", "colors": []},
+  "product_name": "Puppenhaus aus Holz",
+  "product_category": "toys",
+  "scene": "Photorealistic lifestyle photo of a bright, calm, tidy living room with a light grey sofa, a wooden floor and a large window with soft daylight. No other toys anywhere. The left part of the floor in the foreground is empty",
+  "persons": [{"age_years": 5, "description": "a girl with strawberry-blonde hair in a casual cotton sweater and trousers, sitting cross-legged on the floor on the right side of the image, looking happily to the left, fully clothed"}],
+  "width": 1024,
+  "height": 1024,
+  "base_seed": 2611,
+  "variants_per_motif": 6,
+  "motifs": [{"motif_id": "neben-puppenhaus", "placement": {"x": 70, "y": 480}}]
+}

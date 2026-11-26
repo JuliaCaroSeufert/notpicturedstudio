@@ -1,0 +1,15 @@
+{
+  "campaign_id": "test-puppenhaus",
+  "shooting_id": "wohnzimmer-2",
+  "brand": {"name": "Testmarke", "colors": []},
+  "product_name": "Puppenhaus aus Holz",
+  "product_category": "toys",
+  "product_description": "A single small white wooden dollhouse, three storeys with one pastel blue roof and a chimney, stands on the wooden floor on the left and casts a soft shadow. Directly above the roof of the dollhouse the grey sofa and the white wall are visible",
+  "scene": "Photorealistic lifestyle photo of a bright, calm, tidy living room with a light grey sofa, a wooden floor and a large window with soft daylight. No other toys anywhere",
+  "persons": [{"age_years": 5, "description": "a girl with strawberry-blonde hair in a casual cotton sweater and trousers, sitting cross-legged on the floor right next to the dollhouse, looking at it happily, fully clothed"}],
+  "width": 1024,
+  "height": 1024,
+  "base_seed": 2611,
+  "variants_per_motif": 6,
+  "motifs": [{"motif_id": "neben-puppenhaus", "placement": {"x": 70, "y": 480}}]
+}

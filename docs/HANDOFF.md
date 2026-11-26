@@ -1,4 +1,4 @@
-# Handoff: Stand am 11.11.2026 (für die GPU-Session)
+# Handoff: Stand am 26.11.2026 (nach der ersten GPU-Sitzung)
 
 Dieses Dokument überträgt den Stand in eine neue Session, die direkt auf dem GPU-Rechner läuft. Die frühere Fassung (Stand nach der Recherche) liegt in der Git-Historie.
 
@@ -7,6 +7,16 @@ Dieses Dokument überträgt den Stand in eine neue Session, die direkt auf dem G
 **Arbeitsweise (von ihr so gewollt):** Modul für Modul, mit Tests und einem Checkpoint-Bericht nach jedem Schritt. Vor jedem neuen Schritt ihr OK abwarten. Vor jeder Modellfestlegung die Lizenz an der Quelle lesen und jedes Gating nennen. Bei Unsicherheit blockieren statt durchlassen.
 
 **Branch:** `claude/hopeful-clarke-eyxge1`.
+
+## 0. Stand am Ende der Sitzung vom 26.11.2026 (zuerst lesen)
+
+- Erledigt: Punkt 1 (Umgebung), Punkt 2 (erster FLUX-Lauf, deterministisch gemacht), aus Punkt 5 vorgezogen: Szene um das Produkt malen (Inpainting). Punkt 3 (Wasserzeichen) und 4 (Kalibrierung) sind noch offen; Reihenfolge jetzt: Rest von Punkt 5 bzw. Produktqualität, dann 3, dann 4.
+- Der GPU-Rechner wurde danach gelöscht. Neu einrichten nach `docs/GPU_EINRICHTUNG.md`, dann Umgebung wie in Punkt 1 beschrieben (torch zuerst aus dem cu130-Index).
+- **Wunsch der Auftraggeberin für den Start der nächsten Sitzung:** Sie will sich die Bilder des Test-Shootings noch einmal ansehen. Ihr Urteil: **Das Puppenhaus sieht immer noch schlecht aus.** Erst mit ihr klären, was genau stört, bevor weitergebaut wird.
+- Galerie mit beiden Durchgängen (privat, bleibt erhalten): https://claude.ai/artifact/HtBa7Et68PpEDzWHgq62Uz. Eine erste Galerie mit acht Stillleben ohne Menschen: https://claude.ai/artifact/4ZF7mA7csWKey7hRbVwPeu.
+- Eingaben zum Wiederholen liegen in `examples/test-puppenhaus/` (Briefings, freigestelltes Demo-Puppenhaus, Original vor dem Freistellen). Das Puppenhaus ist selbst mit FLUX erzeugt (Seed 33, Studiofoto auf Weiß) und mit OpenCV-GrabCut freigestellt. `wohnzimmer-1` lief noch mit einer älteren Freistellung (kleine Kerbe links). Aufruf: `.venv/bin/nps run --out out/test-julia --brief examples/test-puppenhaus/brief-wohnzimmer-2.json --product examples/test-puppenhaus/puppenhaus.png --engine flux2-klein-4b --safety-gate provisional --upload-gate detectors`. Wegen der deterministischen Einstellungen sollten auf einer H200 mit denselben Versionen dieselben Bilder entstehen.
+- Audit-Kette und Bilder des Test-Shootings sind mit dem Rechner gelöscht. Keine Variante wurde freigegeben oder abgelehnt. Freigaben trägt die Auftraggeberin unter dem Namen „Julia" ein.
+- Vermutungen, warum das Haus noch schlecht wirkt (nicht geprüft): Das Produktfoto ist frontal und von vorn ausgeleuchtet, die Szene aber leicht von oben mit Fensterlicht von der Seite; Licht und Perspektive passen daher nicht. Die vereinbarte Angleichung des Produktfotos (Helligkeit, Farbstich) ist noch nicht gebaut. Der Rand von 2 px ist schmal. Ein echtes Produktfoto in passender Perspektive würde vermutlich mehr helfen als jede Technik.
 
 ## 1. Dokumente
 
