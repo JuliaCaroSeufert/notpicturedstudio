@@ -143,8 +143,19 @@ class DiffusersBackend:
         self._device = "cuda"
 
     def load(self, config: Flux2KleinConfig) -> LoadedModel:
+        # Without these settings the same seed gave one of two slightly
+        # different images in fresh processes on an H200 (measured 2026-11-26).
+        # cuBLAS reads this variable when CUDA starts; if it is missing, torch
+        # refuses to run instead of silently producing a different image.
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
         import diffusers
         import torch
+
+        torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
         import transformers
         from diffusers import Flux2KleinPipeline
 
@@ -161,13 +172,15 @@ class DiffusersBackend:
 
         self._device = config.device
         self._pipe = Flux2KleinPipeline.from_pretrained(
-            model_dir, torch_dtype=torch.bfloat16, local_files_only=True
+            model_dir, dtype=torch.bfloat16, local_files_only=True
         ).to(config.device)
 
         runtime = {
             "python": platform.python_version(),
             "device": config.device,
             "dtype": "bfloat16",
+            "deterministic": "true",
+            "cublas_workspace_config": os.environ["CUBLAS_WORKSPACE_CONFIG"],
             "container_digest": os.environ.get("NPS_CONTAINER_DIGEST", "unknown"),
         }
         if config.device.startswith("cuda"):
