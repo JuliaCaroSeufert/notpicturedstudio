@@ -44,12 +44,18 @@ class GenerationRequest(BaseModel):
     # in GenerationInputs; the hashes make them part of the reproducible request.
     reference_sha256: tuple[str, ...] = ()
     lora_sha256: tuple[str, ...] = ()
+    # Inpainting (Capability.INPAINT): the engine starts from the canvas and
+    # repaints only where the mask is white. Both are given together or not at all.
+    canvas_sha256: str | None = None
+    mask_sha256: str | None = None
 
 
 @dataclass(frozen=True)
 class GenerationInputs:
     references: tuple[Image.Image, ...] = ()
     lora_paths: tuple[Path, ...] = ()
+    canvas: Image.Image | None = None
+    mask: Image.Image | None = None
 
 
 def check_inputs(request: GenerationRequest, inputs: GenerationInputs | None) -> GenerationInputs:
@@ -59,6 +65,16 @@ def check_inputs(request: GenerationRequest, inputs: GenerationInputs | None) ->
     loras = tuple(sha256_bytes(Path(path).read_bytes()) for path in inputs.lora_paths)
     if references != request.reference_sha256 or loras != request.lora_sha256:
         raise ValueError("reference images or LoRA files do not match the hashes in the request")
+    canvas = sha256_image(inputs.canvas) if inputs.canvas is not None else None
+    mask = sha256_image(inputs.mask) if inputs.mask is not None else None
+    if canvas != request.canvas_sha256 or mask != request.mask_sha256:
+        raise ValueError("canvas or mask do not match the hashes in the request")
+    if (canvas is None) != (mask is None):
+        raise ValueError("canvas and mask must be given together")
+    if inputs.canvas is not None and (
+        inputs.canvas.size != (request.width, request.height) or inputs.mask.size != inputs.canvas.size
+    ):
+        raise ValueError("canvas and mask must have the requested size")
     return inputs
 
 

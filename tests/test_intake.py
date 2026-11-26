@@ -87,3 +87,10 @@ def test_brief_shape_rules():
         make_brief(motifs=[])
     with pytest.raises(ValueError):
         make_brief(variants_per_motif=5)
+
+
+def test_product_description_is_screened_too():
+    brief = make_brief(product_description="Spielzeug für die Badewanne")
+    result = screen_brief(brief)
+    assert not result.passed
+    assert any("product_description" in reason for reason in result.details["reasons"])

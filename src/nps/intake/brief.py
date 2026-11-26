@@ -53,6 +53,8 @@ def screen_brief(brief: ShootingBrief) -> CheckResult:
         reasons.append(f"product category '{brief.product_category.value}' is excluded in v1")
 
     texts = [("product_name", brief.product_name), ("scene", brief.scene)]
+    if brief.product_description:
+        texts.append(("product_description", brief.product_description))
     texts += [(f"persons[{i}].description", p.description) for i, p in enumerate(brief.persons)]
     texts += [(f"motif '{m.motif_id}'", m.description) for m in brief.motifs if m.description]
     for field, text in texts:

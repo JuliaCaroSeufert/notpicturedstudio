@@ -26,6 +26,7 @@ from nps.engine.base import (
     GenerationInputs,
     GenerationRequest,
     GenerationResult,
+    check_inputs,
 )
 
 ENGINE_NAME = "flux2-klein-4b"
@@ -114,7 +115,16 @@ class Backend(Protocol):
     def load(self, config: Flux2KleinConfig) -> LoadedModel: ...
 
     def run(
-        self, *, prompt: str, seed: int, width: int, height: int, steps: int, guidance_scale: float
+        self,
+        *,
+        prompt: str,
+        seed: int,
+        width: int,
+        height: int,
+        steps: int,
+        guidance_scale: float,
+        canvas: Image.Image | None = None,
+        mask: Image.Image | None = None,
     ) -> Image.Image: ...
 
 
@@ -140,6 +150,7 @@ class DiffusersBackend:
 
     def __init__(self) -> None:
         self._pipe: Any = None
+        self._inpaint: Any = None
         self._device = "cuda"
 
     def load(self, config: Flux2KleinConfig) -> LoadedModel:
@@ -198,11 +209,39 @@ class DiffusersBackend:
         )
 
     def run(
-        self, *, prompt: str, seed: int, width: int, height: int, steps: int, guidance_scale: float
+        self,
+        *,
+        prompt: str,
+        seed: int,
+        width: int,
+        height: int,
+        steps: int,
+        guidance_scale: float,
+        canvas: Image.Image | None = None,
+        mask: Image.Image | None = None,
     ) -> Image.Image:
         import torch
 
         generator = torch.Generator(device=self._device).manual_seed(seed)
+        if canvas is not None:
+            if self._inpaint is None:
+                from diffusers import Flux2KleinInpaintPipeline
+
+                # Shares the loaded weights; nothing is loaded twice.
+                self._inpaint = Flux2KleinInpaintPipeline.from_pipe(self._pipe)
+            # strength 1.0: everything under the white mask is painted from
+            # scratch; the canvas there only fixes the size.
+            return self._inpaint(
+                prompt=prompt,
+                image=canvas,
+                mask_image=mask,
+                width=width,
+                height=height,
+                strength=1.0,
+                num_inference_steps=steps,
+                guidance_scale=guidance_scale,
+                generator=generator,
+            ).images[0]
         return self._pipe(
             prompt=prompt,
             width=width,
@@ -236,9 +275,9 @@ class Flux2KleinEngine:
         )
 
     def capabilities(self) -> set[Capability]:
-        # The model also supports multi-reference editing, inpainting and LoRA;
-        # they are listed here once the adapter implements and tests them.
-        return {Capability.TEXT2IMG}
+        # The model also supports multi-reference editing and LoRA; they are
+        # listed here once the adapter implements and tests them.
+        return {Capability.TEXT2IMG, Capability.INPAINT}
 
     def generate(
         self, request: GenerationRequest, inputs: GenerationInputs | None = None
@@ -249,12 +288,17 @@ class Flux2KleinEngine:
             )
         if request.width % 16 or request.height % 16:
             raise ValueError("FLUX.2 [klein] needs width and height divisible by 16")
+        inputs = check_inputs(request, inputs)
         model = self._model()
-        settings = {
+        settings: dict[str, Any] = {
             "variant": self._config.variant.value,
             "steps": self._config.effective_steps,
             "guidance_scale": self._config.effective_guidance,
         }
+        extra: dict[str, Any] = {}
+        if inputs.canvas is not None:
+            settings.update(mode="inpaint", strength=1.0)
+            extra = {"canvas": inputs.canvas, "mask": inputs.mask}
         image = self._backend.run(
             prompt=request.prompt,
             seed=request.seed,
@@ -262,6 +306,7 @@ class Flux2KleinEngine:
             height=request.height,
             steps=settings["steps"],
             guidance_scale=settings["guidance_scale"],
+            **extra,
         ).convert("RGB")
         if image.size != (request.width, request.height):
             raise RuntimeError(f"model returned {image.size}, expected {request.width}x{request.height}")

@@ -29,7 +29,7 @@ from nps.intake.upload import (
     UploadVerdict,
     check_image_via_file,
 )
-from nps.product.composite import composite_product, verify_product_pixels
+from nps.product.composite import composite_product, product_canvas, verify_product_pixels
 from nps.provenance.seal import Sealer
 from nps.safety.gate import SafetyGate
 from nps.state import CampaignState, VersionState, read_campaign
@@ -60,7 +60,7 @@ class VersionRecord:
 
 def build_prompt(brief: ShootingBrief, motif: MotifSpec) -> str:
     colors = ", ".join(brief.brand.colors)
-    parts = [brief.scene, motif.description or ""]
+    parts = [brief.scene, brief.product_description or "", motif.description or ""]
     parts += [f"child, {p.age_years} years old: {p.description}" for p in brief.persons]
     parts.append(f"brand colours: {colors}" if colors else "")
     return ". ".join(part for part in parts if part)
@@ -343,6 +343,11 @@ class Pipeline:
 
         info = self._engine.describe()
         lora_paths = self._lora_paths(identities)
+        # An engine that can inpaint paints the scene around the product, so
+        # size, light and shadow fit. Otherwise the scene is painted without it.
+        canvas = mask = None
+        if Capability.INPAINT in self._engine.capabilities():
+            canvas, mask = product_canvas((brief.width, brief.height), product, motif.placement)
         result = self._engine.generate(
             GenerationRequest(
                 prompt=build_prompt(brief, motif),
@@ -350,8 +355,10 @@ class Pipeline:
                 width=brief.width,
                 height=brief.height,
                 lora_sha256=tuple(identity["lora_sha256"] for identity in identities),
+                canvas_sha256=sha256_image(canvas) if canvas is not None else None,
+                mask_sha256=sha256_image(mask) if mask is not None else None,
             ),
-            GenerationInputs(lora_paths=lora_paths),
+            GenerationInputs(lora_paths=lora_paths, canvas=canvas, mask=mask),
         )
         record(
             "asset_generated",

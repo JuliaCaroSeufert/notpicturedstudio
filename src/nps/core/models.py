@@ -75,6 +75,9 @@ class ShootingBrief(Frozen):
     brand: BrandSpec
     product_name: str = Field(min_length=1)
     product_category: ProductCategory
+    # How the product looks, for the prompt (e.g. "a white wooden dollhouse
+    # with a pastel blue roof"). Helps the model paint the scene around it.
+    product_description: str | None = Field(default=None, min_length=1)
     scene: str = Field(min_length=1)
     persons: list[PersonSpec] = Field(min_length=1)
     width: int = Field(default=1024, ge=64, le=4096)

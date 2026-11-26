@@ -8,7 +8,7 @@ transparent edge pixels are blended and reported separately.
 from __future__ import annotations
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from nps.core.models import CheckResult, Placement
 
@@ -30,6 +30,31 @@ def _require_fit(scene_size: tuple[int, int], product: Image.Image, placement: P
 
 def product_box(product: Image.Image, placement: Placement) -> tuple[int, int, int, int]:
     return (placement.x, placement.y, placement.x + product.width, placement.y + product.height)
+
+
+# Neutral grey behind the product; the model repaints all of it.
+CANVAS_FILL = (128, 128, 128)
+# The mask keeps the product minus this rim, so the model can blend the edge.
+EDGE_RIM_PX = 2
+
+
+def product_canvas(
+    size: tuple[int, int], product: Image.Image, placement: Placement
+) -> tuple[Image.Image, Image.Image]:
+    """Canvas and mask for painting a scene around the product.
+
+    The model sees the product where it will end up and paints room, light and
+    shadow around it, so size and position fit together. White in the mask means
+    "paint here". The real pixels are pasted again afterwards; the canvas only
+    tells the model what stands where.
+    """
+    _require_fit(size, product, placement)
+    canvas = Image.new("RGB", size, CANVAS_FILL)
+    canvas.paste(product, (placement.x, placement.y), mask=product.getchannel("A"))
+    keep = Image.new("L", size, 0)
+    keep.paste(product.getchannel("A").point(lambda a: 255 if a == 255 else 0), (placement.x, placement.y))
+    keep = keep.filter(ImageFilter.MinFilter(2 * EDGE_RIM_PX + 1))
+    return canvas, keep.point(lambda v: 255 - v)
 
 
 def composite_product(scene: Image.Image, product: Image.Image, placement: Placement) -> Image.Image:
